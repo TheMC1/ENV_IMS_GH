@@ -189,7 +189,7 @@ def get_warranty_gantt_data():
         group_by_param = request.args.get('group_by', 'ProjectID')
 
         # Valid grouping fields for Gantt chart
-        valid_fields = ['ProjectID', 'Registry', 'Market', 'Product', 'ProjectType', 'Protocol', 'Client', 'Side', 'OPL_TradeID']
+        valid_fields = ['ProjectID', 'Registry', 'Market', 'Product', 'ProjectType', 'Protocol', 'Buy_Client', 'Sell_Client', 'Buy_TradeID', 'Sell_TradeID']
 
         # Support multiple group_by fields separated by comma
         group_by_fields = [f.strip() for f in group_by_param.split(',') if f.strip() in valid_fields]
@@ -198,10 +198,37 @@ def get_warranty_gantt_data():
 
         today = datetime.now().date()
 
-        # Filter out warranties without dates
-        warranties = [w for w in warranties if w.get('Warranty_Start') and w.get('Warranty_End')]
+        # Filter warranties that have at least one set of dates (Buy or Sell)
+        warranties = [w for w in warranties if (w.get('Buy_Start') and w.get('Buy_End')) or (w.get('Sell_Start') and w.get('Sell_End'))]
 
-        # Group warranties by the specified fields and aggregate volumes
+        # Helper function to parse dates
+        def parse_date(date_str):
+            if not date_str:
+                return None
+            try:
+                return datetime.strptime(date_str, '%Y-%m-%d').date()
+            except:
+                try:
+                    return datetime.strptime(date_str, '%m/%d/%Y').date()
+                except:
+                    return None
+
+        # Helper function to determine status
+        def get_status(end_date):
+            if not end_date:
+                return 'no-warranty'
+            days_until_expiry = (end_date - today).days
+            if days_until_expiry < 0:
+                return 'expired'
+            elif days_until_expiry <= 30:
+                return 'expiring-30'
+            elif days_until_expiry <= 90:
+                return 'expiring-90'
+            else:
+                return 'active'
+
+        # Group warranties by the specified fields AND by serial_group (Buy+Sell date combination)
+        # This ensures bars from the same warranty batch stay together
         grouped_data = {}
 
         for warranty in warranties:
@@ -219,84 +246,68 @@ def get_warranty_gantt_data():
                 continue
 
             group_key = ' | '.join(key_parts)
-            warranty_start = warranty.get('Warranty_Start', '')
-            warranty_end = warranty.get('Warranty_End', '')
+
+            # Create serial_group key from Buy+Sell date combination
+            buy_start = warranty.get('Buy_Start', '') or ''
+            buy_end = warranty.get('Buy_End', '') or ''
+            sell_start = warranty.get('Sell_Start', '') or ''
+            sell_end = warranty.get('Sell_End', '') or ''
+            serial_group = f"{buy_start}|{buy_end}|{sell_start}|{sell_end}"
 
             if group_key not in grouped_data:
                 grouped_data[group_key] = {
-                    'periods': {},  # Dictionary to track unique warranty periods
+                    'serial_groups': {},  # Dictionary to track unique serial groups
                     'total_volume': 0
                 }
 
             grouped_data[group_key]['total_volume'] += 1
 
-            # Create a unique key for this warranty period
-            period_key = f"{warranty_start}_{warranty_end}"
-
-            if period_key not in grouped_data[group_key]['periods']:
-                grouped_data[group_key]['periods'][period_key] = {
-                    'start': warranty_start,
-                    'end': warranty_end,
+            if serial_group not in grouped_data[group_key]['serial_groups']:
+                grouped_data[group_key]['serial_groups'][serial_group] = {
+                    'buy_start': buy_start,
+                    'buy_end': buy_end,
+                    'sell_start': sell_start,
+                    'sell_end': sell_end,
                     'volume': 0
                 }
-
-            grouped_data[group_key]['periods'][period_key]['volume'] += 1
+            grouped_data[group_key]['serial_groups'][serial_group]['volume'] += 1
 
         # Convert to list format for frontend
         gantt_items = []
 
         for group_key, data in grouped_data.items():
-            for period_key, period_data in data['periods'].items():
-                start_str = period_data['start']
-                end_str = period_data['end']
-                volume = period_data['volume']
+            # Process each serial group - Buy and Sell bars share the same serial_group index
+            for serial_group_idx, (serial_group_key, sg_data) in enumerate(data['serial_groups'].items()):
+                # Add Buy period if exists
+                if sg_data['buy_start'] and sg_data['buy_end']:
+                    end_date = parse_date(sg_data['buy_end'])
+                    gantt_items.append({
+                        'label': group_key,
+                        'start': sg_data['buy_start'],
+                        'end': sg_data['buy_end'],
+                        'volume': sg_data['volume'],
+                        'total_group_volume': data['total_volume'],
+                        'status': get_status(end_date),
+                        'period_type': 'buy',
+                        'serial_group': serial_group_idx  # Numeric index - same for Buy and Sell
+                    })
 
-                # Parse dates
-                start_date = None
-                end_date = None
+                # Add Sell period if exists
+                if sg_data['sell_start'] and sg_data['sell_end']:
+                    end_date = parse_date(sg_data['sell_end'])
+                    gantt_items.append({
+                        'label': group_key,
+                        'start': sg_data['sell_start'],
+                        'end': sg_data['sell_end'],
+                        'volume': sg_data['volume'],
+                        'total_group_volume': data['total_volume'],
+                        'status': get_status(end_date),
+                        'period_type': 'sell',
+                        'serial_group': serial_group_idx  # Numeric index - same for Buy and Sell
+                    })
 
-                if start_str:
-                    try:
-                        start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
-                    except:
-                        try:
-                            start_date = datetime.strptime(start_str, '%m/%d/%Y').date()
-                        except:
-                            pass
-
-                if end_str:
-                    try:
-                        end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
-                    except:
-                        try:
-                            end_date = datetime.strptime(end_str, '%m/%d/%Y').date()
-                        except:
-                            pass
-
-                # Determine status based on warranty end date
-                status = 'no-warranty'
-                if start_date and end_date:
-                    days_until_expiry = (end_date - today).days
-                    if days_until_expiry < 0:
-                        status = 'expired'
-                    elif days_until_expiry <= 30:
-                        status = 'expiring-30'
-                    elif days_until_expiry <= 90:
-                        status = 'expiring-90'
-                    else:
-                        status = 'active'
-
-                gantt_items.append({
-                    'label': group_key,
-                    'start': start_str,
-                    'end': end_str,
-                    'volume': volume,
-                    'total_group_volume': data['total_volume'],
-                    'status': status
-                })
-
-        # Sort by label
-        gantt_items.sort(key=lambda x: (x['label'], x['start'] or ''))
+        # Sort by label and serial_group
+        gantt_items.sort(key=lambda x: (x['label'], x.get('serial_group', 0), x['start'] or ''))
 
         # Calculate date range for timeline
         all_dates = []
@@ -886,7 +897,8 @@ def get_warranties():
 
         if not headers:
             headers = ['Serial', 'Market', 'Registry', 'Product', 'ProjectID', 'ProjectType',
-                      'Protocol', 'ProjectName', 'IsCustody', 'Warranty_Start', 'Warranty_End']
+                      'Protocol', 'ProjectName', 'IsCustody', 'Buy_Start', 'Buy_End', 'Buy_TradeID',
+                      'Buy_Client', 'Sell_Start', 'Sell_End', 'Sell_TradeID', 'Sell_Client']
 
         return jsonify({'headers': headers, 'data': data})
     except Exception as e:
@@ -903,14 +915,17 @@ def update_warranty():
         if row_index is None or not updates:
             return jsonify({'error': 'Missing row_index or updates'}), 400
 
-        # Only allow updates to warranty fields (Warranty_Start, Warranty_End, OPL_TradeID, Client, Side)
+        # Only allow updates to warranty fields (Buy_Start, Buy_End, Sell_Start, Sell_End, Buy_TradeID, Sell_TradeID, Buy_Client, Sell_Client)
         # Other fields come from inventory and cannot be edited here
         warranty_updates = {
-            'Warranty_Start': updates.get('Warranty_Start', ''),
-            'Warranty_End': updates.get('Warranty_End', ''),
-            'OPL_TradeID': updates.get('OPL_TradeID', ''),
-            'Client': updates.get('Client', ''),
-            'Side': updates.get('Side', '')
+            'Buy_Start': updates.get('Buy_Start', ''),
+            'Buy_End': updates.get('Buy_End', ''),
+            'Sell_Start': updates.get('Sell_Start', ''),
+            'Sell_End': updates.get('Sell_End', ''),
+            'Buy_TradeID': updates.get('Buy_TradeID', ''),
+            'Sell_TradeID': updates.get('Sell_TradeID', ''),
+            'Buy_Client': updates.get('Buy_Client', ''),
+            'Sell_Client': updates.get('Sell_Client', '')
         }
 
         success, message = update_warranty_item(row_index, warranty_updates)
@@ -978,11 +993,14 @@ def commit_warranties_batch():
             row_index = int(row_index_str)
             # Only extract warranty fields from updates
             warranty_updates = {
-                'Warranty_Start': updates.get('Warranty_Start', ''),
-                'Warranty_End': updates.get('Warranty_End', ''),
-                'OPL_TradeID': updates.get('OPL_TradeID', ''),
-                'Client': updates.get('Client', ''),
-                'Side': updates.get('Side', '')
+                'Buy_Start': updates.get('Buy_Start', ''),
+                'Buy_End': updates.get('Buy_End', ''),
+                'Sell_Start': updates.get('Sell_Start', ''),
+                'Sell_End': updates.get('Sell_End', ''),
+                'Buy_TradeID': updates.get('Buy_TradeID', ''),
+                'Sell_TradeID': updates.get('Sell_TradeID', ''),
+                'Buy_Client': updates.get('Buy_Client', ''),
+                'Sell_Client': updates.get('Sell_Client', '')
             }
             update_warranty_item(row_index, warranty_updates)
 

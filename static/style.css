@@ -921,10 +921,10 @@ tbody td {
 
 .gantt-row {
     display: flex;
-    align-items: center;
-    min-height: 32px;
+    align-items: stretch;
     border-bottom: 1px solid #f0f0f0;
     transition: background-color 0.2s;
+    position: relative;
 }
 
 .gantt-row:hover {
@@ -939,12 +939,13 @@ tbody td {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
 }
 
 .gantt-row-timeline {
     flex: 1;
     position: relative;
-    height: 24px;
 }
 
 .gantt-month-lines {
@@ -1025,7 +1026,6 @@ tbody td {
 .gantt-bar {
     position: absolute;
     height: 20px;
-    top: 2px;
     border-radius: 4px;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
@@ -1065,6 +1065,34 @@ tbody td {
 
 .gantt-bar.no-warranty {
     background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+}
+
+/* Sell bars - use striped pattern overlay */
+.gantt-bar.sell {
+    position: relative;
+}
+
+.gantt-bar.sell::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 3px,
+        rgba(255, 255, 255, 0.3) 3px,
+        rgba(255, 255, 255, 0.3) 6px
+    );
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+/* Buy bars - add a subtle bottom border to distinguish */
+.gantt-bar.buy {
+    border-bottom: 2px solid rgba(0, 0, 0, 0.2);
 }
 
 .gantt-today-line {
@@ -1118,6 +1146,33 @@ tbody td {
 
 .legend-color.no-warranty {
     background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+}
+
+.legend-color.buy-indicator {
+    background: linear-gradient(135deg, #1565c0 0%, #42a5f5 100%);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.legend-color.sell-indicator {
+    background: linear-gradient(135deg, #1565c0 0%, #42a5f5 100%);
+    position: relative;
+}
+
+.legend-color.sell-indicator::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.4) 2px,
+        rgba(255, 255, 255, 0.4) 4px
+    );
+    border-radius: 3px;
 }
 
 .gantt-empty {
@@ -1273,6 +1328,111 @@ tbody td {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Group By Order List */
+.groupby-order-list {
+    border-bottom: 1px solid #e0e0e0;
+    padding: 8px;
+    background-color: #f8f9fa;
+    min-height: 32px;
+}
+
+.groupby-order-list:empty::before {
+    content: "Select fields below to add...";
+    color: #999;
+    font-size: 12px;
+    font-style: italic;
+}
+
+.groupby-order-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: grab;
+}
+
+.groupby-order-item:last-child {
+    margin-bottom: 0;
+}
+
+.groupby-order-item:active {
+    cursor: grabbing;
+}
+
+.groupby-order-item.dragging {
+    opacity: 0.5;
+    background: #e8e8e8;
+}
+
+.groupby-order-item.drag-over {
+    border-top: 2px solid #667eea;
+}
+
+.groupby-order-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.groupby-order-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.groupby-order-controls {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.groupby-order-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: #e9ecef;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #555;
+    padding: 0;
+    transition: background-color 0.2s;
+}
+
+.groupby-order-btn:hover {
+    background: #dee2e6;
+}
+
+.groupby-order-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.groupby-order-btn.remove {
+    color: #dc3545;
+}
+
+.groupby-order-btn.remove:hover {
+    background: #f8d7da;
 }
 
 .btn-fullscreen {
@@ -1431,7 +1591,7 @@ tbody td {
     border-radius: 10px;
     max-width: 95vw;
     max-height: 80vh;
-    width: 1200px;
+    width: 80vw;
     display: flex;
     flex-direction: column;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);

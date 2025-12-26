@@ -117,45 +117,52 @@
                                     <span class="multi-select-arrow">&#9662;</span>
                                 </div>
                                 <div class="multi-select-dropdown" id="ganttGroupByDropdown">
+                                    <div class="groupby-order-list" id="groupByOrderList">
+                                        <!-- Ordered selected items will be displayed here -->
+                                    </div>
                                     <div class="multi-select-actions">
                                         <button type="button" onclick="clearAllGroupBy()">Clear All</button>
                                     </div>
                                     <div class="multi-select-options" id="ganttGroupByOptions">
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_ProjectID" value="ProjectID" checked onchange="onGroupByCheckboxChange()">
+                                            <input type="checkbox" id="groupby_ProjectID" value="ProjectID" checked onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_ProjectID">Project ID</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Registry" value="Registry" onchange="onGroupByCheckboxChange()">
+                                            <input type="checkbox" id="groupby_Registry" value="Registry" onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_Registry">Registry</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Market" value="Market" onchange="onGroupByCheckboxChange()">
+                                            <input type="checkbox" id="groupby_Market" value="Market" onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_Market">Market</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Product" value="Product" onchange="onGroupByCheckboxChange()">
+                                            <input type="checkbox" id="groupby_Product" value="Product" onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_Product">Product</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_ProjectType" value="ProjectType" onchange="onGroupByCheckboxChange()">
+                                            <input type="checkbox" id="groupby_ProjectType" value="ProjectType" onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_ProjectType">Project Type</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Protocol" value="Protocol" onchange="onGroupByCheckboxChange()">
+                                            <input type="checkbox" id="groupby_Protocol" value="Protocol" onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_Protocol">Protocol</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Client" value="Client" onchange="onGroupByCheckboxChange()">
-                                            <label for="groupby_Client">Client</label>
+                                            <input type="checkbox" id="groupby_Buy_Client" value="Buy_Client" onchange="onGroupByCheckboxChange(event)">
+                                            <label for="groupby_Buy_Client">Buy Client</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Side" value="Side" onchange="onGroupByCheckboxChange()">
-                                            <label for="groupby_Side">Side</label>
+                                            <input type="checkbox" id="groupby_Buy_TradeID" value="Buy_TradeID" onchange="onGroupByCheckboxChange(event)">
+                                            <label for="groupby_Buy_TradeID">Buy Trade ID</label>
                                         </div>
                                         <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_OPL_TradeID" value="OPL_TradeID" onchange="onGroupByCheckboxChange()">
-                                            <label for="groupby_OPL_TradeID">OPL Trade ID</label>
+                                            <input type="checkbox" id="groupby_Sell_Client" value="Sell_Client" onchange="onGroupByCheckboxChange(event)">
+                                            <label for="groupby_Sell_Client">Sell Client</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Sell_TradeID" value="Sell_TradeID" onchange="onGroupByCheckboxChange(event)">
+                                            <label for="groupby_Sell_TradeID">Sell Trade ID</label>
                                         </div>
                                     </div>
                                 </div>
@@ -192,19 +199,27 @@
                     <div class="gantt-legend">
                         <div class="legend-item">
                             <span class="legend-color active"></span>
-                            <span>Active Warranty (>90 days)</span>
+                            <span>Active (>90 days)</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-color expiring-90"></span>
-                            <span>Expiring in 90 days</span>
+                            <span>Expiring 90 days</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-color expiring-30"></span>
-                            <span>Expiring in 30 days</span>
+                            <span>Expiring 30 days</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-color expired"></span>
                             <span>Expired</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color buy-indicator"></span>
+                            <span>Buy Warranty</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color sell-indicator"></span>
+                            <span>Sell Warranty</span>
                         </div>
                     </div>
                 </div>
@@ -236,8 +251,14 @@
                             <th>Project Name</th>
                             <th>Project Type</th>
                             <th>Protocol</th>
-                            <th>Warranty Start</th>
-                            <th>Warranty End</th>
+                            <th>Buy Start</th>
+                            <th>Buy End</th>
+                            <th>Buy Trade ID</th>
+                            <th>Buy Client</th>
+                            <th>Sell Start</th>
+                            <th>Sell End</th>
+                            <th>Sell Trade ID</th>
+                            <th>Sell Client</th>
                         </tr>
                     </thead>
                     <tbody id="creditsDialogBody">
@@ -263,45 +284,52 @@
                         <span class="multi-select-arrow">&#9662;</span>
                     </div>
                     <div class="multi-select-dropdown" id="ganttGroupByDropdownFullscreen">
+                        <div class="groupby-order-list" id="groupByOrderListFullscreen">
+                            <!-- Ordered selected items will be displayed here -->
+                        </div>
                         <div class="multi-select-actions">
                             <button type="button" onclick="clearAllGroupByFullscreen()">Clear All</button>
                         </div>
                         <div class="multi-select-options" id="ganttGroupByOptionsFullscreen">
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_ProjectID" value="ProjectID" checked onchange="onGroupByCheckboxChangeFullscreen()">
+                                <input type="checkbox" id="groupby_fs_ProjectID" value="ProjectID" checked onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_ProjectID">Project ID</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Registry" value="Registry" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <input type="checkbox" id="groupby_fs_Registry" value="Registry" onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_Registry">Registry</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Market" value="Market" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <input type="checkbox" id="groupby_fs_Market" value="Market" onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_Market">Market</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Product" value="Product" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <input type="checkbox" id="groupby_fs_Product" value="Product" onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_Product">Product</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_ProjectType" value="ProjectType" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <input type="checkbox" id="groupby_fs_ProjectType" value="ProjectType" onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_ProjectType">Project Type</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Protocol" value="Protocol" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <input type="checkbox" id="groupby_fs_Protocol" value="Protocol" onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_Protocol">Protocol</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Client" value="Client" onchange="onGroupByCheckboxChangeFullscreen()">
-                                <label for="groupby_fs_Client">Client</label>
+                                <input type="checkbox" id="groupby_fs_Buy_Client" value="Buy_Client" onchange="onGroupByCheckboxChangeFullscreen(event)">
+                                <label for="groupby_fs_Buy_Client">Buy Client</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Side" value="Side" onchange="onGroupByCheckboxChangeFullscreen()">
-                                <label for="groupby_fs_Side">Side</label>
+                                <input type="checkbox" id="groupby_fs_Buy_TradeID" value="Buy_TradeID" onchange="onGroupByCheckboxChangeFullscreen(event)">
+                                <label for="groupby_fs_Buy_TradeID">Buy Trade ID</label>
                             </div>
                             <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_OPL_TradeID" value="OPL_TradeID" onchange="onGroupByCheckboxChangeFullscreen()">
-                                <label for="groupby_fs_OPL_TradeID">OPL Trade ID</label>
+                                <input type="checkbox" id="groupby_fs_Sell_Client" value="Sell_Client" onchange="onGroupByCheckboxChangeFullscreen(event)">
+                                <label for="groupby_fs_Sell_Client">Sell Client</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Sell_TradeID" value="Sell_TradeID" onchange="onGroupByCheckboxChangeFullscreen(event)">
+                                <label for="groupby_fs_Sell_TradeID">Sell Trade ID</label>
                             </div>
                         </div>
                     </div>
@@ -333,19 +361,27 @@
         <div class="gantt-fullscreen-legend">
             <div class="legend-item">
                 <span class="legend-color active"></span>
-                <span>Active Warranty (>90 days)</span>
+                <span>Active (>90 days)</span>
             </div>
             <div class="legend-item">
                 <span class="legend-color expiring-90"></span>
-                <span>Expiring in 90 days</span>
+                <span>Expiring 90 days</span>
             </div>
             <div class="legend-item">
                 <span class="legend-color expiring-30"></span>
-                <span>Expiring in 30 days</span>
+                <span>Expiring 30 days</span>
             </div>
             <div class="legend-item">
                 <span class="legend-color expired"></span>
                 <span>Expired</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color buy-indicator"></span>
+                <span>Buy Warranty</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color sell-indicator"></span>
+                <span>Sell Warranty</span>
             </div>
         </div>
     </div>
@@ -522,14 +558,8 @@
                 settings.inventoryGroupBy = inventoryGroupBy.value;
             }
 
-            // Gantt chart group by checkboxes
-            const groupByCheckboxes = document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]');
-            settings.ganttGroupBy = [];
-            groupByCheckboxes.forEach(cb => {
-                if (cb.checked) {
-                    settings.ganttGroupBy.push(cb.value);
-                }
-            });
+            // Gantt chart group by - save the ordered array
+            settings.ganttGroupBy = [...groupByOrder];
 
             // Gantt chart filters
             const filterCheckboxes = document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]');
@@ -544,7 +574,11 @@
         }
 
         function applySettings(settings) {
-            if (!settings || Object.keys(settings).length === 0) return;
+            if (!settings || Object.keys(settings).length === 0) {
+                // No settings - render initial order list
+                renderGroupByOrderList(false);
+                return;
+            }
 
             // Apply inventory group by
             if (settings.inventoryGroupBy) {
@@ -554,12 +588,17 @@
                 }
             }
 
-            // Apply gantt group by checkboxes
+            // Apply gantt group by - restore the ordered array
             if (settings.ganttGroupBy && Array.isArray(settings.ganttGroupBy) && settings.ganttGroupBy.length > 0) {
+                groupByOrder = [...settings.ganttGroupBy];
                 document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
-                    cb.checked = settings.ganttGroupBy.includes(cb.value);
+                    cb.checked = groupByOrder.includes(cb.value);
                 });
+                renderGroupByOrderList(false);
                 updateGroupByText();
+            } else {
+                // No saved settings - render initial order list
+                renderGroupByOrderList(false);
             }
         }
 
@@ -646,11 +685,22 @@
         let selectedFilters = new Set();
         let selectedFiltersFullscreen = new Set();
 
+        // Ordered arrays for group by fields (maintains user-specified order)
+        let groupByOrder = ['ProjectID'];  // Default order
+        let groupByOrderFullscreen = ['ProjectID'];
+
         // Group By multi-select functions
         function getSelectedGroupByFields(isFullscreen = false) {
-            const containerId = isFullscreen ? 'ganttGroupByOptionsFullscreen' : 'ganttGroupByOptions';
-            const checkboxes = document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`);
-            return Array.from(checkboxes).map(cb => cb.value);
+            // Return the ordered array instead of reading from DOM
+            return isFullscreen ? [...groupByOrderFullscreen] : [...groupByOrder];
+        }
+
+        function setGroupByOrder(order, isFullscreen = false) {
+            if (isFullscreen) {
+                groupByOrderFullscreen = [...order];
+            } else {
+                groupByOrder = [...order];
+            }
         }
 
         function updateGroupByText() {
@@ -685,52 +735,225 @@
                 'Product': 'Product',
                 'ProjectType': 'Project Type',
                 'Protocol': 'Protocol',
-                'Client': 'Client',
-                'Side': 'Side',
-                'OPL_TradeID': 'OPL Trade ID'
+                'Buy_Client': 'Buy Client',
+                'Sell_Client': 'Sell Client',
+                'Buy_TradeID': 'Buy Trade ID',
+                'Sell_TradeID': 'Sell Trade ID'
             };
             return names[field] || field;
         }
 
+        // Render the ordered list of selected fields
+        function renderGroupByOrderList(isFullscreen = false) {
+            const order = isFullscreen ? groupByOrderFullscreen : groupByOrder;
+            const listId = isFullscreen ? 'groupByOrderListFullscreen' : 'groupByOrderList';
+            const listEl = document.getElementById(listId);
+
+            if (order.length === 0) {
+                listEl.innerHTML = '';
+                return;
+            }
+
+            listEl.innerHTML = order.map((field, idx) => `
+                <div class="groupby-order-item" draggable="true" data-field="${field}" data-index="${idx}">
+                    <span class="groupby-order-num">${idx + 1}</span>
+                    <span class="groupby-order-name">${getFieldDisplayName(field)}</span>
+                    <div class="groupby-order-controls">
+                        <button class="groupby-order-btn" onclick="moveGroupByField(${idx}, -1, ${isFullscreen})" ${idx === 0 ? 'disabled' : ''} title="Move up">&#9650;</button>
+                        <button class="groupby-order-btn" onclick="moveGroupByField(${idx}, 1, ${isFullscreen})" ${idx === order.length - 1 ? 'disabled' : ''} title="Move down">&#9660;</button>
+                        <button class="groupby-order-btn remove" onclick="removeGroupByField('${field}', ${isFullscreen})" title="Remove">&times;</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add drag and drop event listeners
+            setupDragAndDrop(listEl, isFullscreen);
+        }
+
+        function setupDragAndDrop(listEl, isFullscreen) {
+            const items = listEl.querySelectorAll('.groupby-order-item');
+            let draggedItem = null;
+            let draggedIndex = null;
+
+            items.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedItem = item;
+                    draggedIndex = parseInt(item.dataset.index);
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('dragging');
+                    items.forEach(i => i.classList.remove('drag-over'));
+                    draggedItem = null;
+                    draggedIndex = null;
+                });
+
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (item !== draggedItem) {
+                        item.classList.add('drag-over');
+                    }
+                });
+
+                item.addEventListener('dragleave', () => {
+                    item.classList.remove('drag-over');
+                });
+
+                item.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    item.classList.remove('drag-over');
+
+                    const dropIndex = parseInt(item.dataset.index);
+                    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+                        const order = isFullscreen ? groupByOrderFullscreen : groupByOrder;
+                        const [movedField] = order.splice(draggedIndex, 1);
+                        order.splice(dropIndex, 0, movedField);
+
+                        renderGroupByOrderList(isFullscreen);
+                        if (isFullscreen) {
+                            updateGroupByTextFullscreen();
+                            await onGroupByChangeFullscreen();
+                            syncFromFullscreen();
+                        } else {
+                            updateGroupByText();
+                            await onGroupByChange();
+                        }
+                        saveDashboardSettings();
+                    }
+                });
+            });
+        }
+
+        async function moveGroupByField(index, direction, isFullscreen = false) {
+            const order = isFullscreen ? groupByOrderFullscreen : groupByOrder;
+            const newIndex = index + direction;
+
+            if (newIndex < 0 || newIndex >= order.length) return;
+
+            // Swap elements
+            [order[index], order[newIndex]] = [order[newIndex], order[index]];
+
+            renderGroupByOrderList(isFullscreen);
+            if (isFullscreen) {
+                updateGroupByTextFullscreen();
+                await onGroupByChangeFullscreen();
+                syncFromFullscreen();
+            } else {
+                updateGroupByText();
+                await onGroupByChange();
+            }
+            saveDashboardSettings();
+        }
+
+        async function removeGroupByField(field, isFullscreen = false) {
+            const order = isFullscreen ? groupByOrderFullscreen : groupByOrder;
+            const idx = order.indexOf(field);
+            if (idx > -1) {
+                order.splice(idx, 1);
+            }
+
+            // Uncheck the checkbox
+            const checkboxId = isFullscreen ? `groupby_fs_${field}` : `groupby_${field}`;
+            const checkbox = document.getElementById(checkboxId);
+            if (checkbox) checkbox.checked = false;
+
+            renderGroupByOrderList(isFullscreen);
+            if (isFullscreen) {
+                updateGroupByTextFullscreen();
+                await onGroupByChangeFullscreen();
+                syncFromFullscreen();
+            } else {
+                updateGroupByText();
+                await onGroupByChange();
+            }
+            saveDashboardSettings();
+        }
+
+        function syncFromFullscreen() {
+            // Sync order from fullscreen to main
+            groupByOrder = [...groupByOrderFullscreen];
+
+            // Sync checkboxes
+            document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = groupByOrder.includes(cb.value);
+            });
+
+            renderGroupByOrderList(false);
+            updateGroupByText();
+        }
+
         async function clearAllGroupBy() {
+            groupByOrder = [];
             document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
                 cb.checked = false;
             });
+            renderGroupByOrderList(false);
             updateGroupByText();
             await onGroupByChange();
             saveDashboardSettings();
         }
 
         async function clearAllGroupByFullscreen() {
+            groupByOrderFullscreen = [];
             document.querySelectorAll('#ganttGroupByOptionsFullscreen input[type="checkbox"]').forEach(cb => {
                 cb.checked = false;
             });
+            renderGroupByOrderList(true);
             updateGroupByTextFullscreen();
             await onGroupByChangeFullscreen();
-            // Sync back to main
-            document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
-                cb.checked = false;
-            });
-            updateGroupByText();
+            syncFromFullscreen();
             saveDashboardSettings();
         }
 
-        async function onGroupByCheckboxChange() {
+        async function onGroupByCheckboxChange(event) {
+            const checkbox = event ? event.target : null;
+            if (checkbox) {
+                const field = checkbox.value;
+                if (checkbox.checked) {
+                    // Add to end of order if not already present
+                    if (!groupByOrder.includes(field)) {
+                        groupByOrder.push(field);
+                    }
+                } else {
+                    // Remove from order
+                    const idx = groupByOrder.indexOf(field);
+                    if (idx > -1) {
+                        groupByOrder.splice(idx, 1);
+                    }
+                }
+            }
+
+            renderGroupByOrderList(false);
             updateGroupByText();
             await onGroupByChange();
-            // Save after async operation completes so filters are updated
             saveDashboardSettings();
         }
 
-        async function onGroupByCheckboxChangeFullscreen() {
+        async function onGroupByCheckboxChangeFullscreen(event) {
+            const checkbox = event ? event.target : null;
+            if (checkbox) {
+                const field = checkbox.value;
+                if (checkbox.checked) {
+                    // Add to end of order if not already present
+                    if (!groupByOrderFullscreen.includes(field)) {
+                        groupByOrderFullscreen.push(field);
+                    }
+                } else {
+                    // Remove from order
+                    const idx = groupByOrderFullscreen.indexOf(field);
+                    if (idx > -1) {
+                        groupByOrderFullscreen.splice(idx, 1);
+                    }
+                }
+            }
+
+            renderGroupByOrderList(true);
             updateGroupByTextFullscreen();
             await onGroupByChangeFullscreen();
-            // Sync back to main and save
-            const fullscreenFields = getSelectedGroupByFields(true);
-            document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
-                cb.checked = fullscreenFields.includes(cb.value);
-            });
-            updateGroupByText();
+            syncFromFullscreen();
             saveDashboardSettings();
         }
 
@@ -1089,9 +1312,35 @@
                 // Calculate weighted average date for this group
                 const avgPercent = calculateWeightedAvgDate(items, minDate, totalDays);
 
-                html += '<div class="gantt-row">';
+                // Assign bars to rows - non-overlapping bars share the same row
+                const barHeight = 20;
+                const barGap = 0;
+                const topPadding = 0;
+                const bottomPadding = 0;
+
+                // Use serial_group directly as row number (Buy and Sell from same warranty share same serial_group)
+                const itemRows = [];
+                let maxRow = 0;
+
+                items.forEach((item, idx) => {
+                    const startDate = parseDateUTC(item.start);
+                    const endDate = parseDateUTC(item.end);
+                    if (startDate && endDate && startDate <= endDate) {
+                        // Use serial_group directly as row number - same as fullscreen version
+                        const row = typeof item.serial_group === 'number' ? item.serial_group : idx;
+                        itemRows[idx] = row;
+                        if (row > maxRow) maxRow = row;
+                    } else {
+                        itemRows[idx] = -1;
+                    }
+                });
+
+                const numRows = maxRow + 1;
+                const rowTimelineHeight = numRows * barHeight;
+
+                html += `<div class="gantt-row">`;
                 html += `<div class="gantt-row-label" title="${label}">${label}</div>`;
-                html += '<div class="gantt-row-timeline">';
+                html += `<div class="gantt-row-timeline" style="height: ${rowTimelineHeight}px;">`;
                 html += monthLinesHtml;
 
                 items.forEach((item, idx) => {
@@ -1099,7 +1348,7 @@
                     const endDate = parseDateUTC(item.end);
                     const dataAttrs = `data-label="${encodeURIComponent(label)}" data-start="${item.start || ''}" data-end="${item.end || ''}" data-volume="${item.volume}"`;
 
-                    if (startDate && endDate && startDate <= endDate) {
+                    if (startDate && endDate && startDate <= endDate && itemRows[idx] >= 0) {
                         // Calculate position and width using UTC dates
                         const startOffset = Math.round((startDate - minDate) / (1000 * 60 * 60 * 24));
                         const endOffset = Math.round((endDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
@@ -1107,22 +1356,28 @@
                         const leftPercent = (startOffset / totalDays) * 100;
                         const widthPercent = ((endOffset - startOffset) / totalDays) * 100;
 
-                        // Create tooltip text
-                        const tooltipText = `${label}\nStart: ${item.start}\nEnd: ${item.end}\nVolume: ${item.volume}\nClick to view credits`;
+                        // Calculate top position based on assigned row
+                        const topPosition = itemRows[idx] * barHeight;
 
-                        html += `<div class="gantt-bar ${item.status}"
-                            style="left: ${leftPercent}%; width: ${widthPercent}%;"
-                            title="${tooltipText}" ${dataAttrs}
+                        // Create tooltip text
+                        const periodLabel = item.period_type === 'sell' ? 'Sell' : 'Buy';
+                        const tooltipText = `${label}\n${periodLabel} Warranty\nStart: ${item.start}\nEnd: ${item.end}\nVolume: ${item.volume}\nClick to view credits`;
+
+                        html += `<div class="gantt-bar ${item.status} ${item.period_type || 'buy'}"
+                            style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topPosition}px;"
+                            title="${tooltipText}" ${dataAttrs} data-period-type="${item.period_type || 'buy'}"
                             onclick="showCreditsDialog(this)">${item.volume}</div>`;
                     }
                 });
 
-                // Add weighted average line
+                html += '</div>'; // Close timeline
+
+                // Add weighted average line (positioned relative to row, after 150px label)
                 if (avgPercent !== null && avgPercent >= 0 && avgPercent <= 100) {
-                    html += `<div class="gantt-avg-line" style="left: ${avgPercent}%;" title="Weighted avg warranty date"></div>`;
+                    html += `<div class="gantt-avg-line" style="left: calc(150px + (100% - 150px) * ${avgPercent / 100});" title="Weighted avg warranty date"></div>`;
                 }
 
-                html += '</div></div>';
+                html += '</div>'; // Close row
             });
 
             // Add today line - position relative to timeline area (after 150px label)
@@ -1174,11 +1429,13 @@
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
 
-            // Sync the group by selections from main view
+            // Sync the group by order and selections from main view
+            groupByOrderFullscreen = [...groupByOrder];
             const mainGroupByFields = getSelectedGroupByFields(false);
             document.querySelectorAll('#ganttGroupByOptionsFullscreen input[type="checkbox"]').forEach(cb => {
                 cb.checked = mainGroupByFields.includes(cb.value);
             });
+            renderGroupByOrderList(true);
             updateGroupByTextFullscreen();
 
             // Sync filters from main view
@@ -1321,17 +1578,42 @@
                 // Calculate weighted average date for this group
                 const avgPercent = calculateWeightedAvgDate(items, minDate, totalDays);
 
-                html += '<div class="gantt-row">';
+                // Assign bars to rows - non-overlapping bars share the same row
+                const barHeightFS = 28;
+                const barGapFS = 0;
+                const topPaddingFS = 0;
+                const bottomPaddingFS = 0;
+
+                // Use serial_group directly as row number (Buy and Sell from same warranty share same serial_group)
+                const itemRowsFS = [];
+                let maxRowFS = 0;
+
+                items.forEach((item, idx) => {
+                    const startDate = parseDateUTC(item.start);
+                    const endDate = parseDateUTC(item.end);
+                    if (startDate && endDate && startDate <= endDate) {
+                        const row = typeof item.serial_group === 'number' ? item.serial_group : idx;
+                        itemRowsFS[idx] = row;
+                        if (row > maxRowFS) maxRowFS = row;
+                    } else {
+                        itemRowsFS[idx] = -1;
+                    }
+                });
+
+                const numRowsFS = maxRowFS + 1;
+                const rowTimelineHeightFS = numRowsFS * barHeightFS;
+
+                html += `<div class="gantt-row">`;
                 html += `<div class="gantt-row-label" title="${label}">${label}</div>`;
-                html += '<div class="gantt-row-timeline">';
+                html += `<div class="gantt-row-timeline" style="height: ${rowTimelineHeightFS}px;">`;
                 html += monthLinesHtml;
 
-                items.forEach(item => {
+                items.forEach((item, idx) => {
                     const startDate = parseDateUTC(item.start);
                     const endDate = parseDateUTC(item.end);
                     const dataAttrs = `data-label="${encodeURIComponent(label)}" data-start="${item.start || ''}" data-end="${item.end || ''}" data-volume="${item.volume}" data-fullscreen="true"`;
 
-                    if (startDate && endDate && startDate <= endDate) {
+                    if (startDate && endDate && startDate <= endDate && itemRowsFS[idx] >= 0) {
                         // Calculate position and width using UTC dates
                         const startOffset = Math.round((startDate - minDate) / (1000 * 60 * 60 * 24));
                         const endOffset = Math.round((endDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
@@ -1339,22 +1621,28 @@
                         const leftPercent = (startOffset / totalDays) * 100;
                         const widthPercent = ((endOffset - startOffset) / totalDays) * 100;
 
-                        // Create tooltip text
-                        const tooltipText = `${label}\nStart: ${item.start}\nEnd: ${item.end}\nVolume: ${item.volume}\nClick to view credits`;
+                        // Calculate top position based on assigned row
+                        const topPositionFS = itemRowsFS[idx] * barHeightFS;
 
-                        html += `<div class="gantt-bar ${item.status}"
-                            style="left: ${leftPercent}%; width: ${widthPercent}%;"
-                            title="${tooltipText}" ${dataAttrs}
+                        // Create tooltip text
+                        const periodLabel = item.period_type === 'sell' ? 'Sell' : 'Buy';
+                        const tooltipText = `${label}\n${periodLabel} Warranty\nStart: ${item.start}\nEnd: ${item.end}\nVolume: ${item.volume}\nClick to view credits`;
+
+                        html += `<div class="gantt-bar ${item.status} ${item.period_type || 'buy'}"
+                            style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topPositionFS}px;"
+                            title="${tooltipText}" ${dataAttrs} data-period-type="${item.period_type || 'buy'}"
                             onclick="showCreditsDialogFullscreen(this)">${item.volume}</div>`;
                     }
                 });
 
-                // Add weighted average line
+                html += '</div>'; // Close timeline
+
+                // Add weighted average line (positioned relative to row, after 200px label)
                 if (avgPercent !== null && avgPercent >= 0 && avgPercent <= 100) {
-                    html += `<div class="gantt-avg-line" style="left: ${avgPercent}%;" title="Weighted avg warranty date"></div>`;
+                    html += `<div class="gantt-avg-line" style="left: calc(200px + (100% - 200px) * ${avgPercent / 100});" title="Weighted avg warranty date"></div>`;
                 }
 
-                html += '</div></div>';
+                html += '</div>'; // Close row
             });
 
             // Add today line - position relative to timeline area (after 200px label)
@@ -1374,9 +1662,10 @@
             const label = decodeURIComponent(barElement.dataset.label);
             const startDate = barElement.dataset.start;
             const endDate = barElement.dataset.end;
+            const periodType = barElement.dataset.periodType || 'buy';
 
-            // Get current group by field from fullscreen dropdown
-            const groupBy = document.getElementById('ganttGroupByFullscreen').value;
+            // Get current group by fields from fullscreen (multi-select)
+            const groupByFields = getSelectedGroupByFields(true);
 
             // Fetch warranty data to get matching credits
             try {
@@ -1384,11 +1673,27 @@
                 if (!response.ok) throw new Error('Failed to fetch warranties');
                 const warrantyData = await response.json();
 
-                // Filter credits that match this bar
+                // Filter credits that match this bar based on period type (Buy or Sell)
                 const matchingCredits = warrantyData.data.filter(item => {
-                    const itemGroupValue = item[groupBy] || 'Unknown';
-                    const itemStart = item.Warranty_Start || '';
-                    const itemEnd = item.Warranty_End || '';
+                    // Build composite group key from multiple fields (same as backend)
+                    const keyParts = [];
+                    for (const field of groupByFields) {
+                        const value = item[field];
+                        if (!value || String(value).trim() === '') {
+                            return false; // Skip items with empty group field values
+                        }
+                        keyParts.push(String(value).trim());
+                    }
+                    const itemGroupValue = keyParts.join(' | ');
+
+                    let itemStart, itemEnd;
+                    if (periodType === 'sell') {
+                        itemStart = item.Sell_Start || '';
+                        itemEnd = item.Sell_End || '';
+                    } else {
+                        itemStart = item.Buy_Start || '';
+                        itemEnd = item.Buy_End || '';
+                    }
 
                     return itemGroupValue === label &&
                            itemStart === startDate &&
@@ -1397,9 +1702,10 @@
 
                 // Update dialog title and subtitle
                 document.getElementById('creditsDialogTitle').textContent = label;
+                const periodLabel = periodType === 'sell' ? 'Sell' : 'Buy';
                 let subtitle = '';
                 if (startDate && endDate) {
-                    subtitle = `Warranty Period: ${startDate} to ${endDate}`;
+                    subtitle = `${periodLabel} Warranty Period: ${startDate} to ${endDate}`;
                 } else {
                     subtitle = 'No warranty dates set';
                 }
@@ -1411,7 +1717,7 @@
                 // Populate table
                 const tbody = document.getElementById('creditsDialogBody');
                 if (groupedCredits.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #999;">No credits found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="17" style="text-align: center; color: #999;">No credits found</td></tr>';
                 } else {
                     tbody.innerHTML = groupedCredits.map(group => `
                         <tr>
@@ -1424,8 +1730,14 @@
                             <td>${group.projectName}</td>
                             <td>${group.projectType}</td>
                             <td>${group.protocol}</td>
-                            <td>${group.warrantyStart}</td>
-                            <td>${group.warrantyEnd}</td>
+                            <td>${group.buyStart}</td>
+                            <td>${group.buyEnd}</td>
+                            <td>${group.buyTradeId}</td>
+                            <td>${group.buyClient}</td>
+                            <td>${group.sellStart}</td>
+                            <td>${group.sellEnd}</td>
+                            <td>${group.sellTradeId}</td>
+                            <td>${group.sellClient}</td>
                         </tr>
                     `).join('');
                 }
@@ -1456,7 +1768,7 @@
             const groups = {};
 
             credits.forEach(credit => {
-                const key = `${credit.Market || ''}|${credit.Registry || ''}|${credit.Product || ''}|${credit.ProjectID || ''}|${credit.ProjectName || ''}|${credit.ProjectType || ''}|${credit.Protocol || ''}|${credit.Warranty_Start || ''}|${credit.Warranty_End || ''}`;
+                const key = `${credit.Market || ''}|${credit.Registry || ''}|${credit.Product || ''}|${credit.ProjectID || ''}|${credit.ProjectName || ''}|${credit.ProjectType || ''}|${credit.Protocol || ''}|${credit.Buy_Start || ''}|${credit.Buy_End || ''}|${credit.Buy_TradeID || ''}|${credit.Buy_Client || ''}|${credit.Sell_Start || ''}|${credit.Sell_End || ''}|${credit.Sell_TradeID || ''}|${credit.Sell_Client || ''}`;
 
                 if (!groups[key]) {
                     groups[key] = {
@@ -1468,8 +1780,14 @@
                         projectName: credit.ProjectName || '-',
                         projectType: credit.ProjectType || '-',
                         protocol: credit.Protocol || '-',
-                        warrantyStart: credit.Warranty_Start || '-',
-                        warrantyEnd: credit.Warranty_End || '-'
+                        buyStart: credit.Buy_Start || '-',
+                        buyEnd: credit.Buy_End || '-',
+                        buyTradeId: credit.Buy_TradeID || '-',
+                        buyClient: credit.Buy_Client || '-',
+                        sellStart: credit.Sell_Start || '-',
+                        sellEnd: credit.Sell_End || '-',
+                        sellTradeId: credit.Sell_TradeID || '-',
+                        sellClient: credit.Sell_Client || '-'
                     };
                 }
                 groups[key].serials.push(credit.Serial);
@@ -1529,8 +1847,14 @@
                     projectName: group.projectName,
                     projectType: group.projectType,
                     protocol: group.protocol,
-                    warrantyStart: group.warrantyStart,
-                    warrantyEnd: group.warrantyEnd
+                    buyStart: group.buyStart,
+                    buyEnd: group.buyEnd,
+                    buyTradeId: group.buyTradeId,
+                    buyClient: group.buyClient,
+                    sellStart: group.sellStart,
+                    sellEnd: group.sellEnd,
+                    sellTradeId: group.sellTradeId,
+                    sellClient: group.sellClient
                 };
             });
         }
@@ -1555,9 +1879,10 @@
             const startDate = barElement.dataset.start;
             const endDate = barElement.dataset.end;
             const volume = barElement.dataset.volume;
+            const periodType = barElement.dataset.periodType || 'buy';
 
-            // Get current group by field
-            const groupBy = document.getElementById('ganttGroupBy').value;
+            // Get current group by fields (multi-select)
+            const groupByFields = getSelectedGroupByFields(false);
 
             // Fetch warranty data to get matching credits
             try {
@@ -1565,11 +1890,27 @@
                 if (!response.ok) throw new Error('Failed to fetch warranties');
                 const warrantyData = await response.json();
 
-                // Filter credits that match this bar
+                // Filter credits that match this bar based on period type (Buy or Sell)
                 const matchingCredits = warrantyData.data.filter(item => {
-                    const itemGroupValue = item[groupBy] || 'Unknown';
-                    const itemStart = item.Warranty_Start || '';
-                    const itemEnd = item.Warranty_End || '';
+                    // Build composite group key from multiple fields (same as backend)
+                    const keyParts = [];
+                    for (const field of groupByFields) {
+                        const value = item[field];
+                        if (!value || String(value).trim() === '') {
+                            return false; // Skip items with empty group field values
+                        }
+                        keyParts.push(String(value).trim());
+                    }
+                    const itemGroupValue = keyParts.join(' | ');
+
+                    let itemStart, itemEnd;
+                    if (periodType === 'sell') {
+                        itemStart = item.Sell_Start || '';
+                        itemEnd = item.Sell_End || '';
+                    } else {
+                        itemStart = item.Buy_Start || '';
+                        itemEnd = item.Buy_End || '';
+                    }
 
                     return itemGroupValue === label &&
                            itemStart === startDate &&
@@ -1578,9 +1919,10 @@
 
                 // Update dialog title and subtitle
                 document.getElementById('creditsDialogTitle').textContent = label;
+                const periodLabel = periodType === 'sell' ? 'Sell' : 'Buy';
                 let subtitle = '';
                 if (startDate && endDate) {
-                    subtitle = `Warranty Period: ${startDate} to ${endDate}`;
+                    subtitle = `${periodLabel} Warranty Period: ${startDate} to ${endDate}`;
                 } else {
                     subtitle = 'No warranty dates set';
                 }
@@ -1592,7 +1934,7 @@
                 // Populate table
                 const tbody = document.getElementById('creditsDialogBody');
                 if (groupedCredits.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #999;">No credits found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="17" style="text-align: center; color: #999;">No credits found</td></tr>';
                 } else {
                     tbody.innerHTML = groupedCredits.map(group => `
                         <tr>
@@ -1605,8 +1947,14 @@
                             <td>${group.projectName}</td>
                             <td>${group.projectType}</td>
                             <td>${group.protocol}</td>
-                            <td>${group.warrantyStart}</td>
-                            <td>${group.warrantyEnd}</td>
+                            <td>${group.buyStart}</td>
+                            <td>${group.buyEnd}</td>
+                            <td>${group.buyTradeId}</td>
+                            <td>${group.buyClient}</td>
+                            <td>${group.sellStart}</td>
+                            <td>${group.sellEnd}</td>
+                            <td>${group.sellTradeId}</td>
+                            <td>${group.sellClient}</td>
                         </tr>
                     `).join('');
                 }

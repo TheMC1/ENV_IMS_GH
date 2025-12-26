@@ -375,15 +375,69 @@ def init_inventory_database():
         CREATE TABLE IF NOT EXISTS warranties (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             serial TEXT UNIQUE NOT NULL,
-            warranty_start TEXT,
-            warranty_end TEXT,
-            opl_tradeid INTEGER,
-            client TEXT,
-            side TEXT,
+            buy_start TEXT,
+            buy_end TEXT,
+            sell_start TEXT,
+            sell_end TEXT,
+            buy_tradeid INTEGER,
+            sell_tradeid INTEGER,
+            buy_client TEXT,
+            sell_client TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Migration: Check if old column names exist and rename/add new columns
+    cursor.execute("PRAGMA table_info(warranties)")
+    warranty_columns = [column[1] for column in cursor.fetchall()]
+
+    # Migrate from old column names to new ones
+    # warranty_start/warranty_end -> warranty_buy_start/warranty_buy_end -> buy_start/buy_end
+    if 'warranty_start' in warranty_columns and 'buy_start' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN warranty_start TO buy_start")
+    if 'warranty_end' in warranty_columns and 'buy_end' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN warranty_end TO buy_end")
+    if 'warranty_buy_start' in warranty_columns and 'buy_start' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN warranty_buy_start TO buy_start")
+    if 'warranty_buy_end' in warranty_columns and 'buy_end' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN warranty_buy_end TO buy_end")
+    if 'warranty_sell_start' in warranty_columns and 'sell_start' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN warranty_sell_start TO sell_start")
+    if 'warranty_sell_end' in warranty_columns and 'sell_end' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN warranty_sell_end TO sell_end")
+
+    # Rename opl_tradeid to buy_tradeid and client to buy_client
+    if 'opl_tradeid' in warranty_columns and 'buy_tradeid' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN opl_tradeid TO buy_tradeid")
+    if 'client' in warranty_columns and 'buy_client' not in warranty_columns:
+        cursor.execute("ALTER TABLE warranties RENAME COLUMN client TO buy_client")
+
+    # Add new columns if they don't exist
+    # Re-fetch columns after renames
+    cursor.execute("PRAGMA table_info(warranties)")
+    warranty_columns = [column[1] for column in cursor.fetchall()]
+
+    if 'sell_start' not in warranty_columns:
+        try:
+            cursor.execute("ALTER TABLE warranties ADD COLUMN sell_start TEXT")
+        except:
+            pass
+    if 'sell_end' not in warranty_columns:
+        try:
+            cursor.execute("ALTER TABLE warranties ADD COLUMN sell_end TEXT")
+        except:
+            pass
+    if 'sell_tradeid' not in warranty_columns:
+        try:
+            cursor.execute("ALTER TABLE warranties ADD COLUMN sell_tradeid INTEGER")
+        except:
+            pass
+    if 'sell_client' not in warranty_columns:
+        try:
+            cursor.execute("ALTER TABLE warranties ADD COLUMN sell_client TEXT")
+        except:
+            pass
 
     conn.commit()
     conn.close()
@@ -499,8 +553,8 @@ def add_inventory_item(item_data):
         if serial:
             try:
                 cursor.execute(
-                    "INSERT INTO warranties (serial, warranty_start, warranty_end, opl_tradeid, client, side) VALUES (?, ?, ?, ?, ?, ?)",
-                    (serial, '', '', None, '', '')
+                    "INSERT INTO warranties (serial, buy_start, buy_end, sell_start, sell_end, buy_tradeid, sell_tradeid, buy_client, sell_client) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (serial, '', '', '', '', None, None, '', '')
                 )
             except Exception as warranty_error:
                 # If warranty creation fails, rollback inventory insert
@@ -746,11 +800,14 @@ def get_all_warranty_items():
             SELECT
                 w.id,
                 w.serial,
-                w.warranty_start,
-                w.warranty_end,
-                w.opl_tradeid,
-                w.client,
-                w.side,
+                w.buy_start,
+                w.buy_end,
+                w.sell_start,
+                w.sell_end,
+                w.buy_tradeid,
+                w.sell_tradeid,
+                w.buy_client,
+                w.sell_client,
                 i.market,
                 i.registry,
                 i.product,
@@ -772,11 +829,14 @@ def get_all_warranty_items():
             item_data = {
                 '_row_index': row['id'],
                 'Serial': row['serial'],
-                'Warranty_Start': row['warranty_start'] or '',
-                'Warranty_End': row['warranty_end'] or '',
-                'OPL_TradeID': row['opl_tradeid'] if row['opl_tradeid'] is not None else '',
-                'Client': row['client'] or '',
-                'Side': row['side'] or '',
+                'Buy_Start': row['buy_start'] or '',
+                'Buy_End': row['buy_end'] or '',
+                'Sell_Start': row['sell_start'] or '',
+                'Sell_End': row['sell_end'] or '',
+                'Buy_TradeID': row['buy_tradeid'] if row['buy_tradeid'] is not None else '',
+                'Sell_TradeID': row['sell_tradeid'] if row['sell_tradeid'] is not None else '',
+                'Buy_Client': row['buy_client'] or '',
+                'Sell_Client': row['sell_client'] or '',
                 'Market': row['market'] or '',
                 'Registry': row['registry'] or '',
                 'Product': row['product'] or '',
@@ -818,11 +878,14 @@ def get_warranty_headers():
         'ProjectName',
         'IsCustody',
         'Serial',
-        'Warranty_Start',
-        'Warranty_End',
-        'OPL_TradeID',
-        'Client',
-        'Side'
+        'Buy_Start',
+        'Buy_End',
+        'Buy_TradeID',
+        'Buy_Client',
+        'Sell_Start',
+        'Sell_End',
+        'Sell_TradeID',
+        'Sell_Client'
     ]
 
     # Order headers according to preferred order
@@ -840,27 +903,38 @@ def get_warranty_headers():
     return ordered_headers
 
 def add_warranty_item(item_data):
-    """Add a new warranty item (only warranty fields: Serial, Warranty_Start, Warranty_End, OPL_TradeID, Client, Side)
+    """Add a new warranty item (only warranty fields: Serial, Buy_Start, Buy_End, Sell_Start, Sell_End, Buy_TradeID, Sell_TradeID, Buy_Client, Sell_Client)
     Validates that Serial exists in inventory to maintain one-to-one relationship"""
     try:
         conn = get_inventory_db_connection()
         cursor = conn.cursor()
 
         serial = item_data.get('Serial', '')
-        warranty_start = item_data.get('Warranty_Start', '')
-        warranty_end = item_data.get('Warranty_End', '')
-        opl_tradeid = item_data.get('OPL_TradeID', None)
-        client = item_data.get('Client', '')
-        side = item_data.get('Side', '')
+        buy_start = item_data.get('Buy_Start', '')
+        buy_end = item_data.get('Buy_End', '')
+        sell_start = item_data.get('Sell_Start', '')
+        sell_end = item_data.get('Sell_End', '')
+        buy_tradeid = item_data.get('Buy_TradeID', None)
+        sell_tradeid = item_data.get('Sell_TradeID', None)
+        buy_client = item_data.get('Buy_Client', '')
+        sell_client = item_data.get('Sell_Client', '')
 
-        # Convert OPL_TradeID to int if it's a non-empty string
-        if opl_tradeid == '' or opl_tradeid is None:
-            opl_tradeid = None
+        # Convert TradeIDs to int if they're non-empty strings
+        if buy_tradeid == '' or buy_tradeid is None:
+            buy_tradeid = None
         else:
             try:
-                opl_tradeid = int(opl_tradeid)
+                buy_tradeid = int(buy_tradeid)
             except (ValueError, TypeError):
-                opl_tradeid = None
+                buy_tradeid = None
+
+        if sell_tradeid == '' or sell_tradeid is None:
+            sell_tradeid = None
+        else:
+            try:
+                sell_tradeid = int(sell_tradeid)
+            except (ValueError, TypeError):
+                sell_tradeid = None
 
         if not serial:
             conn.close()
@@ -878,8 +952,8 @@ def add_warranty_item(item_data):
             return False, f"Serial '{serial}' does not exist in inventory. Add inventory item first."
 
         cursor.execute(
-            "INSERT INTO warranties (serial, warranty_start, warranty_end, opl_tradeid, client, side) VALUES (?, ?, ?, ?, ?, ?)",
-            (serial, warranty_start, warranty_end, opl_tradeid, client, side)
+            "INSERT INTO warranties (serial, buy_start, buy_end, sell_start, sell_end, buy_tradeid, sell_tradeid, buy_client, sell_client) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (serial, buy_start, buy_end, sell_start, sell_end, buy_tradeid, sell_tradeid, buy_client, sell_client)
         )
 
         conn.commit()
@@ -891,30 +965,41 @@ def add_warranty_item(item_data):
         return False, str(e)
 
 def update_warranty_item(item_id, item_data):
-    """Update a warranty item (only warranty fields can be updated: Warranty_Start, Warranty_End, OPL_TradeID, Client, Side)"""
+    """Update a warranty item (only warranty fields can be updated: Buy_Start, Buy_End, Sell_Start, Sell_End, Buy_TradeID, Sell_TradeID, Buy_Client, Sell_Client)"""
     try:
         conn = get_inventory_db_connection()
         cursor = conn.cursor()
 
         # Only update warranty fields, not Serial
-        warranty_start = item_data.get('Warranty_Start', '')
-        warranty_end = item_data.get('Warranty_End', '')
-        opl_tradeid = item_data.get('OPL_TradeID', None)
-        client = item_data.get('Client', '')
-        side = item_data.get('Side', '')
+        buy_start = item_data.get('Buy_Start', '')
+        buy_end = item_data.get('Buy_End', '')
+        sell_start = item_data.get('Sell_Start', '')
+        sell_end = item_data.get('Sell_End', '')
+        buy_tradeid = item_data.get('Buy_TradeID', None)
+        sell_tradeid = item_data.get('Sell_TradeID', None)
+        buy_client = item_data.get('Buy_Client', '')
+        sell_client = item_data.get('Sell_Client', '')
 
-        # Convert OPL_TradeID to int if it's a non-empty string
-        if opl_tradeid == '' or opl_tradeid is None:
-            opl_tradeid = None
+        # Convert TradeIDs to int if they're non-empty strings
+        if buy_tradeid == '' or buy_tradeid is None:
+            buy_tradeid = None
         else:
             try:
-                opl_tradeid = int(opl_tradeid)
+                buy_tradeid = int(buy_tradeid)
             except (ValueError, TypeError):
-                opl_tradeid = None
+                buy_tradeid = None
+
+        if sell_tradeid == '' or sell_tradeid is None:
+            sell_tradeid = None
+        else:
+            try:
+                sell_tradeid = int(sell_tradeid)
+            except (ValueError, TypeError):
+                sell_tradeid = None
 
         cursor.execute(
-            "UPDATE warranties SET warranty_start = ?, warranty_end = ?, opl_tradeid = ?, client = ?, side = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (warranty_start, warranty_end, opl_tradeid, client, side, item_id)
+            "UPDATE warranties SET buy_start = ?, buy_end = ?, sell_start = ?, sell_end = ?, buy_tradeid = ?, sell_tradeid = ?, buy_client = ?, sell_client = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (buy_start, buy_end, sell_start, sell_end, buy_tradeid, sell_tradeid, buy_client, sell_client, item_id)
         )
 
         conn.commit()

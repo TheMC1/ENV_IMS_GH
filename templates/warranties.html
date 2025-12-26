@@ -565,28 +565,43 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="warrantyOplTradeId">OPL_TradeID:</label>
-                            <input type="text" id="warrantyOplTradeId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter OPL Trade ID">
+                            <label for="buyTradeId">Buy_TradeID:</label>
+                            <input type="text" id="buyTradeId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Buy Trade ID">
                         </div>
 
                         <div class="form-group">
-                            <label for="warrantyClient">Client:</label>
-                            <input type="text" id="warrantyClient" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Client">
+                            <label for="buyClient">Buy_Client:</label>
+                            <input type="text" id="buyClient" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Buy Client">
                         </div>
 
                         <div class="form-group">
-                            <label for="warrantySide">Side:</label>
-                            <input type="text" id="warrantySide" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Side">
+                            <label for="buyStart">Buy_Start:</label>
+                            <input type="date" id="buyStart" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
                         </div>
 
                         <div class="form-group">
-                            <label for="warrantyStart">Warranty Start:</label>
-                            <input type="date" id="warrantyStart" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                            <label for="buyEnd">Buy_End:</label>
+                            <input type="date" id="buyEnd" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
                         </div>
 
                         <div class="form-group">
-                            <label for="warrantyEnd">Warranty End:</label>
-                            <input type="date" id="warrantyEnd" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                            <label for="sellTradeId">Sell_TradeID:</label>
+                            <input type="text" id="sellTradeId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Sell Trade ID">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellClient">Sell_Client:</label>
+                            <input type="text" id="sellClient" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Sell Client">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellStart">Sell_Start:</label>
+                            <input type="date" id="sellStart" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellEnd">Sell_End:</label>
+                            <input type="date" id="sellEnd" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
                         </div>
 
                         <div id="warrantyAssignPreview" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #e0e0e0; display: none;">
@@ -1008,14 +1023,14 @@
             detectSerialColumn();
             const serialColumn = headers[serialColumnIndex];
 
-            // Group by warranty fields: OPL_TradeID, Client, Side, Warranty_Start, Warranty_End
+            // Group by warranty fields: Buy_TradeID, Buy_Client, Buy_Start, Buy_End, Sell_TradeID, Sell_Client, Sell_Start, Sell_End
             // Plus consecutive serials within each group
             const groups = {};
 
             data.forEach(row => {
-                // Create a key from warranty fields only: OPL_TradeID, Client, Side, Warranty_Start, Warranty_End
+                // Create a key from warranty fields only
                 // Normalize values (trim and lowercase) for better grouping
-                const warrantyFields = ['OPL_TradeID', 'Client', 'Side', 'Warranty_Start', 'Warranty_End'];
+                const warrantyFields = ['Buy_TradeID', 'Buy_Client', 'Buy_Start', 'Buy_End', 'Sell_TradeID', 'Sell_Client', 'Sell_Start', 'Sell_End'];
                 const keyParts = [];
                 warrantyFields.forEach(field => {
                     const value = (row[field] || '').toString().trim().toLowerCase();
@@ -1512,9 +1527,9 @@
                     const td = document.createElement('td');
                     const isSerialColumn = headerIdx === serialColumnIndex;
 
-                    // Only warranty fields are editable: Warranty_Start, Warranty_End, OPL_TradeID, Client, Side
+                    // Only warranty fields are editable: Buy_Start, Buy_End, Buy_TradeID, Buy_Client, Sell_Start, Sell_End, Sell_TradeID, Sell_Client
                     // All other fields come from inventory and are read-only
-                    const editableFields = ['Warranty_Start', 'Warranty_End', 'OPL_TradeID', 'Client', 'Side'];
+                    const editableFields = ['Buy_Start', 'Buy_End', 'Buy_TradeID', 'Buy_Client', 'Sell_Start', 'Sell_End', 'Sell_TradeID', 'Sell_Client'];
                     const isWarrantyField = editableFields.includes(header);
                     const canEdit = !isReadOnly && !isDeleted && isWarrantyField && (!isSummarized || !isSerialColumn);
                     td.className = canEdit ? 'editable' : '';
@@ -2637,11 +2652,14 @@
         function showAssignWarranty() {
             const modal = document.getElementById('assignWarrantyModal');
             document.getElementById('warrantySerialInput').value = '';
-            document.getElementById('warrantyOplTradeId').value = '';
-            document.getElementById('warrantyClient').value = '';
-            document.getElementById('warrantySide').value = '';
-            document.getElementById('warrantyStart').value = '';
-            document.getElementById('warrantyEnd').value = '';
+            document.getElementById('buyTradeId').value = '';
+            document.getElementById('buyClient').value = '';
+            document.getElementById('buyStart').value = '';
+            document.getElementById('buyEnd').value = '';
+            document.getElementById('sellTradeId').value = '';
+            document.getElementById('sellClient').value = '';
+            document.getElementById('sellStart').value = '';
+            document.getElementById('sellEnd').value = '';
             document.getElementById('warrantyAssignPreview').style.display = 'none';
             document.getElementById('confirmAssignWarrantyBtn').style.display = 'none';
             warrantyAssignSerials = [];
@@ -2706,13 +2724,16 @@
             }
 
             // Validate that at least one warranty field is filled
-            const oplTradeId = document.getElementById('warrantyOplTradeId').value.trim();
-            const client = document.getElementById('warrantyClient').value.trim();
-            const side = document.getElementById('warrantySide').value.trim();
-            const warrantyStart = document.getElementById('warrantyStart').value;
-            const warrantyEnd = document.getElementById('warrantyEnd').value;
+            const buyTradeId = document.getElementById('buyTradeId').value.trim();
+            const buyClient = document.getElementById('buyClient').value.trim();
+            const buyStart = document.getElementById('buyStart').value;
+            const buyEnd = document.getElementById('buyEnd').value;
+            const sellTradeId = document.getElementById('sellTradeId').value.trim();
+            const sellClient = document.getElementById('sellClient').value.trim();
+            const sellStart = document.getElementById('sellStart').value;
+            const sellEnd = document.getElementById('sellEnd').value;
 
-            if (!oplTradeId && !client && !side && !warrantyStart && !warrantyEnd) {
+            if (!buyTradeId && !buyClient && !buyStart && !buyEnd && !sellTradeId && !sellClient && !sellStart && !sellEnd) {
                 showAlert('Please fill in at least one warranty field', 'warning');
                 return;
             }
@@ -2755,11 +2776,14 @@
 
                 // Show what will be updated
                 listHTML += '<br><br><strong>Warranty fields to be updated:</strong><br>';
-                if (oplTradeId) listHTML += `• OPL_TradeID: ${oplTradeId}<br>`;
-                if (client) listHTML += `• Client: ${client}<br>`;
-                if (side) listHTML += `• Side: ${side}<br>`;
-                if (warrantyStart) listHTML += `• Warranty_Start: ${warrantyStart}<br>`;
-                if (warrantyEnd) listHTML += `• Warranty_End: ${warrantyEnd}<br>`;
+                if (buyTradeId) listHTML += `• Buy_TradeID: ${buyTradeId}<br>`;
+                if (buyClient) listHTML += `• Buy_Client: ${buyClient}<br>`;
+                if (buyStart) listHTML += `• Buy_Start: ${buyStart}<br>`;
+                if (buyEnd) listHTML += `• Buy_End: ${buyEnd}<br>`;
+                if (sellTradeId) listHTML += `• Sell_TradeID: ${sellTradeId}<br>`;
+                if (sellClient) listHTML += `• Sell_Client: ${sellClient}<br>`;
+                if (sellStart) listHTML += `• Sell_Start: ${sellStart}<br>`;
+                if (sellEnd) listHTML += `• Sell_End: ${sellEnd}<br>`;
 
                 listDiv.innerHTML = listHTML;
                 document.getElementById('confirmAssignWarrantyBtn').style.display = 'inline-block';
@@ -2774,11 +2798,14 @@
                 return;
             }
 
-            const oplTradeId = document.getElementById('warrantyOplTradeId').value.trim();
-            const client = document.getElementById('warrantyClient').value.trim();
-            const side = document.getElementById('warrantySide').value.trim();
-            const warrantyStart = document.getElementById('warrantyStart').value;
-            const warrantyEnd = document.getElementById('warrantyEnd').value;
+            const buyTradeId = document.getElementById('buyTradeId').value.trim();
+            const buyClient = document.getElementById('buyClient').value.trim();
+            const buyStart = document.getElementById('buyStart').value;
+            const buyEnd = document.getElementById('buyEnd').value;
+            const sellTradeId = document.getElementById('sellTradeId').value.trim();
+            const sellClient = document.getElementById('sellClient').value.trim();
+            const sellStart = document.getElementById('sellStart').value;
+            const sellEnd = document.getElementById('sellEnd').value;
 
             // Apply warranty information to matching items
             warrantyAssignSerials.forEach(item => {
@@ -2790,11 +2817,14 @@
                 }
 
                 // Update warranty fields
-                if (oplTradeId) pendingChanges.modified[rowIndex]['OPL_TradeID'] = oplTradeId;
-                if (client) pendingChanges.modified[rowIndex]['Client'] = client;
-                if (side) pendingChanges.modified[rowIndex]['Side'] = side;
-                if (warrantyStart) pendingChanges.modified[rowIndex]['Warranty_Start'] = warrantyStart;
-                if (warrantyEnd) pendingChanges.modified[rowIndex]['Warranty_End'] = warrantyEnd;
+                if (buyTradeId) pendingChanges.modified[rowIndex]['Buy_TradeID'] = buyTradeId;
+                if (buyClient) pendingChanges.modified[rowIndex]['Buy_Client'] = buyClient;
+                if (buyStart) pendingChanges.modified[rowIndex]['Buy_Start'] = buyStart;
+                if (buyEnd) pendingChanges.modified[rowIndex]['Buy_End'] = buyEnd;
+                if (sellTradeId) pendingChanges.modified[rowIndex]['Sell_TradeID'] = sellTradeId;
+                if (sellClient) pendingChanges.modified[rowIndex]['Sell_Client'] = sellClient;
+                if (sellStart) pendingChanges.modified[rowIndex]['Sell_Start'] = sellStart;
+                if (sellEnd) pendingChanges.modified[rowIndex]['Sell_End'] = sellEnd;
             });
 
             updateChangesIndicator();
