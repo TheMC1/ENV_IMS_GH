@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Carbon IMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container dashboard-container">
+        <div class="dashboard-box">
+            <header class="home-header">
+                <h1>Dashboard</h1>
+                <div class="header-actions">
+                    <a href="{{ url_for('home') }}" class="btn-secondary">Home</a>
+                    <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="dashboard-quartiles">
+                <!-- Cell 1: Pie Chart -->
+                <div class="quartile" id="quartile-1">
+                    <div class="quartile-header">
+                        <h3>Inventory by Category</h3>
+                        <div class="chart-controls">
+                            <label for="groupBySelect">Group by:</label>
+                            <select id="groupBySelect" onchange="updateChart(); saveDashboardSettings();">
+                                <option value="Registry" selected>Registry</option>
+                                <option value="Market">Market</option>
+                                <option value="Product">Product</option>
+                                <option value="ProjectType">Project Type</option>
+                                <option value="Protocol">Protocol</option>
+                                <option value="IsCustody">Custody Status</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                    <div class="chart-stats" id="chartStats">
+                        <span class="stat-total">Total: <strong id="totalCount">0</strong> items</span>
+                    </div>
+                </div>
+
+                <!-- Cell 2: Inventory Summary -->
+                <div class="quartile" id="quartile-2">
+                    <div class="quartile-header">
+                        <h3>Inventory Summary</h3>
+                        <div class="chart-controls">
+                            <label for="summaryGroupBy">Group by:</label>
+                            <select id="summaryGroupBy" onchange="updateSummaryView()">
+                                <option value="Registry" selected>Registry</option>
+                                <option value="Market">Market</option>
+                                <option value="Product">Product</option>
+                                <option value="ProjectType">Project Type</option>
+                                <option value="Protocol">Protocol</option>
+                                <option value="IsCustody">Custody Status</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="quartile-content placeholder-content">
+                        <div class="summary-stats" id="summaryStats">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cell 3: Quick Actions -->
+                <div class="quartile" id="quartile-3">
+                    <div class="quartile-header">
+                        <h3>Quick Actions</h3>
+                    </div>
+                    <div class="quartile-content">
+                        <div class="quick-actions">
+                            <a href="{{ url_for('inventory') }}" class="action-btn">
+                                <span class="action-icon">&#128230;</span>
+                                <span>Manage Inventory</span>
+                            </a>
+                            <a href="{{ url_for('warranties') }}" class="action-btn">
+                                <span class="action-icon">&#128196;</span>
+                                <span>View Warranties</span>
+                            </a>
+                            {% if user_role == 'admin' %}
+                            <a href="{{ url_for('manage_users') }}" class="action-btn">
+                                <span class="action-icon">&#128101;</span>
+                                <span>User Management</span>
+                            </a>
+                            {% endif %}
+                            <a href="{{ url_for('settings') }}" class="action-btn">
+                                <span class="action-icon">&#9881;</span>
+                                <span>Settings</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cell 4: Warranty Timeline Gantt Chart (spans 3 columns) -->
+                <div class="quartile span-3" id="quartile-4">
+                    <div class="quartile-header">
+                        <h3>Warranty Timeline</h3>
+                        <div class="gantt-controls">
+                            <label>Group by:</label>
+                            <div class="multi-select-wrapper" id="ganttGroupByWrapper">
+                                <div class="multi-select-display" onclick="toggleFilterDropdown('ganttGroupByDropdown')">
+                                    <span id="ganttGroupByText">Project ID</span>
+                                    <span class="multi-select-arrow">&#9662;</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="ganttGroupByDropdown">
+                                    <div class="multi-select-actions">
+                                        <button type="button" onclick="clearAllGroupBy()">Clear All</button>
+                                    </div>
+                                    <div class="multi-select-options" id="ganttGroupByOptions">
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_ProjectID" value="ProjectID" checked onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_ProjectID">Project ID</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Registry" value="Registry" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_Registry">Registry</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Market" value="Market" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_Market">Market</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Product" value="Product" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_Product">Product</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_ProjectType" value="ProjectType" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_ProjectType">Project Type</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Protocol" value="Protocol" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_Protocol">Protocol</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Client" value="Client" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_Client">Client</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_Side" value="Side" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_Side">Side</label>
+                                        </div>
+                                        <div class="multi-select-option">
+                                            <input type="checkbox" id="groupby_OPL_TradeID" value="OPL_TradeID" onchange="onGroupByCheckboxChange()">
+                                            <label for="groupby_OPL_TradeID">OPL Trade ID</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="gantt-filter-container">
+                                <label for="ganttFilter">Filter:</label>
+                                <div class="multi-select-wrapper" id="ganttFilterWrapper">
+                                    <div class="multi-select-display" onclick="toggleFilterDropdown('ganttFilterDropdown')">
+                                        <span id="ganttFilterText">All Items</span>
+                                        <span class="multi-select-arrow">&#9662;</span>
+                                    </div>
+                                    <div class="multi-select-dropdown" id="ganttFilterDropdown">
+                                        <div class="multi-select-actions">
+                                            <button type="button" onclick="selectAllFilters()">Select All</button>
+                                            <button type="button" onclick="clearAllFilters()">Clear All</button>
+                                        </div>
+                                        <div class="multi-select-options" id="ganttFilterOptions">
+                                            <!-- Options populated dynamically -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn-fullscreen" onclick="openGanttFullscreen()" title="View fullscreen">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                </svg>
+                                Fullscreen
+                            </button>
+                        </div>
+                    </div>
+                    <div class="gantt-container" id="ganttContainer">
+                        <div class="gantt-empty">Loading warranty data...</div>
+                    </div>
+                    <div class="gantt-legend">
+                        <div class="legend-item">
+                            <span class="legend-color active"></span>
+                            <span>Active Warranty (>90 days)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color expiring-90"></span>
+                            <span>Expiring in 90 days</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color expiring-30"></span>
+                            <span>Expiring in 30 days</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color expired"></span>
+                            <span>Expired</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Credits Data Dialog -->
+    <div class="credits-dialog-overlay" id="creditsDialogOverlay" onclick="closeCreditsDialog(event)">
+        <div class="credits-dialog" onclick="event.stopPropagation()">
+            <div class="credits-dialog-header">
+                <div>
+                    <h3 id="creditsDialogTitle">Credits Details</h3>
+                    <div class="dialog-subtitle" id="creditsDialogSubtitle"></div>
+                </div>
+                <button class="credits-dialog-close" onclick="closeCreditsDialog()">&times;</button>
+            </div>
+            <div class="credits-dialog-body">
+                <table class="credits-table">
+                    <thead id="creditsDialogHead">
+                        <tr>
+                            <th>Serial Range</th>
+                            <th>Count</th>
+                            <th>Market</th>
+                            <th>Registry</th>
+                            <th>Product</th>
+                            <th>Project ID</th>
+                            <th>Project Name</th>
+                            <th>Project Type</th>
+                            <th>Protocol</th>
+                            <th>Warranty Start</th>
+                            <th>Warranty End</th>
+                        </tr>
+                    </thead>
+                    <tbody id="creditsDialogBody">
+                    </tbody>
+                </table>
+            </div>
+            <div class="credits-dialog-footer">
+                <span class="credits-count">Total: <strong id="creditsDialogCount">0</strong> credits</span>
+                <button class="btn-secondary" onclick="closeCreditsDialog()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Modal for Gantt Chart -->
+    <div class="gantt-fullscreen-modal" id="ganttFullscreenModal">
+        <div class="gantt-fullscreen-header">
+            <h2>Warranty Timeline</h2>
+            <div class="gantt-fullscreen-controls">
+                <label>Group by:</label>
+                <div class="multi-select-wrapper" id="ganttGroupByWrapperFullscreen">
+                    <div class="multi-select-display" onclick="toggleFilterDropdown('ganttGroupByDropdownFullscreen')">
+                        <span id="ganttGroupByTextFullscreen">Project ID</span>
+                        <span class="multi-select-arrow">&#9662;</span>
+                    </div>
+                    <div class="multi-select-dropdown" id="ganttGroupByDropdownFullscreen">
+                        <div class="multi-select-actions">
+                            <button type="button" onclick="clearAllGroupByFullscreen()">Clear All</button>
+                        </div>
+                        <div class="multi-select-options" id="ganttGroupByOptionsFullscreen">
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_ProjectID" value="ProjectID" checked onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_ProjectID">Project ID</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Registry" value="Registry" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_Registry">Registry</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Market" value="Market" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_Market">Market</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Product" value="Product" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_Product">Product</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_ProjectType" value="ProjectType" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_ProjectType">Project Type</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Protocol" value="Protocol" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_Protocol">Protocol</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Client" value="Client" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_Client">Client</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_Side" value="Side" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_Side">Side</label>
+                            </div>
+                            <div class="multi-select-option">
+                                <input type="checkbox" id="groupby_fs_OPL_TradeID" value="OPL_TradeID" onchange="onGroupByCheckboxChangeFullscreen()">
+                                <label for="groupby_fs_OPL_TradeID">OPL Trade ID</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="gantt-filter-container">
+                    <label for="ganttFilterFullscreen">Filter:</label>
+                    <div class="multi-select-wrapper" id="ganttFilterWrapperFullscreen">
+                        <div class="multi-select-display" onclick="toggleFilterDropdown('ganttFilterDropdownFullscreen')">
+                            <span id="ganttFilterTextFullscreen">All Items</span>
+                            <span class="multi-select-arrow">&#9662;</span>
+                        </div>
+                        <div class="multi-select-dropdown" id="ganttFilterDropdownFullscreen">
+                            <div class="multi-select-actions">
+                                <button type="button" onclick="selectAllFiltersFullscreen()">Select All</button>
+                                <button type="button" onclick="clearAllFiltersFullscreen()">Clear All</button>
+                            </div>
+                            <div class="multi-select-options" id="ganttFilterOptionsFullscreen">
+                                <!-- Options populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-close-fullscreen" onclick="closeGanttFullscreen()">Close</button>
+            </div>
+        </div>
+        <div class="gantt-fullscreen-body" id="ganttFullscreenBody">
+            <div class="gantt-empty">Loading warranty data...</div>
+        </div>
+        <div class="gantt-fullscreen-legend">
+            <div class="legend-item">
+                <span class="legend-color active"></span>
+                <span>Active Warranty (>90 days)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color expiring-90"></span>
+                <span>Expiring in 90 days</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color expiring-30"></span>
+                <span>Expiring in 30 days</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color expired"></span>
+                <span>Expired</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pieChart = null;
+        const chartColors = [
+            '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe',
+            '#00f2fe', '#43e97b', '#38f9d7', '#fa709a', '#fee140',
+            '#30cfd0', '#c779d0', '#feac5e', '#a8edea', '#fed6e3'
+        ];
+
+        async function fetchChartData(groupBy = 'Registry') {
+            try {
+                const response = await fetch(`/api/dashboard/stats?group_by=${groupBy}`);
+                if (!response.ok) throw new Error('Failed to fetch data');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching chart data:', error);
+                return null;
+            }
+        }
+
+        function createPieChart(labels, values) {
+            const ctx = document.getElementById('pieChart').getContext('2d');
+
+            if (pieChart) {
+                pieChart.destroy();
+            }
+
+            pieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: chartColors.slice(0, labels.length),
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                font: {
+                                    size: 12,
+                                    family: 'Roboto'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const label = pieChart.data.labels[index];
+                            const value = pieChart.data.datasets[0].data[index];
+                            showChartDetail(label, value);
+                        }
+                    }
+                }
+            });
+        }
+
+        function showChartDetail(label, value) {
+            const groupBy = document.getElementById('groupBySelect').value;
+            alert(`${groupBy}: ${label}\nCount: ${value} items`);
+        }
+
+        function updateSummaryStats(data) {
+            const summaryContainer = document.getElementById('summaryStats');
+            if (!data || !data.labels) {
+                summaryContainer.innerHTML = '<p class="placeholder-text">No data available</p>';
+                return;
+            }
+
+            let html = '';
+            const groupBy = data.group_by;
+
+            // Create summary cards for top categories
+            const sortedData = data.labels.map((label, i) => ({
+                label: label,
+                value: data.values[i]
+            })).sort((a, b) => b.value - a.value);
+
+            const topItems = sortedData.slice(0, 5);
+
+            html += `<div class="summary-header">Top ${groupBy} Categories</div>`;
+            html += '<div class="summary-list">';
+
+            topItems.forEach((item, index) => {
+                const percentage = ((item.value / data.total) * 100).toFixed(1);
+                html += `
+                    <div class="summary-item">
+                        <span class="summary-rank" style="background: ${chartColors[index]}">${index + 1}</span>
+                        <span class="summary-label">${item.label}</span>
+                        <span class="summary-value">${item.value} <small>(${percentage}%)</small></span>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            summaryContainer.innerHTML = html;
+        }
+
+        async function updateSummaryView() {
+            const groupBy = document.getElementById('summaryGroupBy').value;
+            const data = await fetchChartData(groupBy);
+
+            if (data && data.labels) {
+                updateSummaryStats(data);
+            }
+        }
+
+        async function updateChart() {
+            const groupBy = document.getElementById('groupBySelect').value;
+            const data = await fetchChartData(groupBy);
+
+            if (data && data.labels) {
+                createPieChart(data.labels, data.values);
+                document.getElementById('totalCount').textContent = data.total;
+                updateSummaryStats(data);
+            }
+        }
+
+        // Dashboard Settings Persistence
+        async function loadDashboardSettings() {
+            try {
+                const response = await fetch('/api/settings/dashboard');
+                if (!response.ok) return {};
+                const data = await response.json();
+                return data.settings || {};
+            } catch (error) {
+                console.error('Error loading dashboard settings:', error);
+                return {};
+            }
+        }
+
+        async function saveDashboardSettings() {
+            try {
+                const settings = collectCurrentSettings();
+                await fetch('/api/settings/dashboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+            } catch (error) {
+                console.error('Error saving dashboard settings:', error);
+            }
+        }
+
+        function collectCurrentSettings() {
+            const settings = {};
+
+            // Inventory Summary group by
+            const inventoryGroupBy = document.getElementById('groupBySelect');
+            if (inventoryGroupBy) {
+                settings.inventoryGroupBy = inventoryGroupBy.value;
+            }
+
+            // Gantt chart group by checkboxes
+            const groupByCheckboxes = document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]');
+            settings.ganttGroupBy = [];
+            groupByCheckboxes.forEach(cb => {
+                if (cb.checked) {
+                    settings.ganttGroupBy.push(cb.value);
+                }
+            });
+
+            // Gantt chart filters
+            const filterCheckboxes = document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]');
+            settings.ganttFilters = [];
+            filterCheckboxes.forEach(cb => {
+                if (cb.checked) {
+                    settings.ganttFilters.push(decodeURIComponent(cb.value));
+                }
+            });
+
+            return settings;
+        }
+
+        function applySettings(settings) {
+            if (!settings || Object.keys(settings).length === 0) return;
+
+            // Apply inventory group by
+            if (settings.inventoryGroupBy) {
+                const inventoryGroupBy = document.getElementById('groupBySelect');
+                if (inventoryGroupBy) {
+                    inventoryGroupBy.value = settings.inventoryGroupBy;
+                }
+            }
+
+            // Apply gantt group by checkboxes
+            if (settings.ganttGroupBy && Array.isArray(settings.ganttGroupBy) && settings.ganttGroupBy.length > 0) {
+                document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
+                    cb.checked = settings.ganttGroupBy.includes(cb.value);
+                });
+                updateGroupByText();
+            }
+        }
+
+        function applyFiltersAfterLoad(settings) {
+            // Apply gantt filters after data is loaded
+            // Only apply filters that exist in the current data options
+            if (settings.ganttFilters && Array.isArray(settings.ganttFilters) && settings.ganttFilters.length > 0) {
+                const availableFilters = new Set();
+                document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                    availableFilters.add(decodeURIComponent(cb.value));
+                });
+
+                // Check if any saved filters match current options
+                const matchingFilters = settings.ganttFilters.filter(f => availableFilters.has(f));
+
+                if (matchingFilters.length > 0) {
+                    selectedFilters.clear();
+                    document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                        const label = decodeURIComponent(cb.value);
+                        if (matchingFilters.includes(label)) {
+                            cb.checked = true;
+                            selectedFilters.add(label);
+                        } else {
+                            cb.checked = false;
+                        }
+                    });
+                    updateFilterText(false);
+                    applyFilterAndRender();
+                }
+                // If no matching filters, keep all selected (default behavior from populateFilterOptions)
+            }
+        }
+
+        // Store loaded settings for use after data loads
+        let loadedSettings = {};
+
+        // Initialize chart on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Load saved settings first
+            loadedSettings = await loadDashboardSettings();
+
+            // Apply settings to UI elements
+            applySettings(loadedSettings);
+
+            // Then load charts
+            updateChart();
+            await updateGanttChart();
+
+            // Apply filters after chart data is loaded
+            if (loadedSettings.ganttFilters) {
+                applyFiltersAfterLoad(loadedSettings);
+            }
+        });
+
+        // Gantt Chart Functions
+        async function fetchGanttData(groupBy = 'ProjectID') {
+            try {
+                const response = await fetch(`/api/dashboard/warranty-gantt?group_by=${groupBy}`);
+                if (!response.ok) throw new Error('Failed to fetch data');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching Gantt data:', error);
+                return null;
+            }
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            // Try YYYY-MM-DD format
+            let date = new Date(dateStr);
+            if (!isNaN(date.getTime())) return date;
+            // Try MM/DD/YYYY format
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                date = new Date(parts[2], parts[0] - 1, parts[1]);
+                if (!isNaN(date.getTime())) return date;
+            }
+            return null;
+        }
+
+        // Store warranty data for dialog
+        let cachedWarrantyData = null;
+        let cachedGanttDataMain = null;
+        let selectedFilters = new Set();
+        let selectedFiltersFullscreen = new Set();
+
+        // Group By multi-select functions
+        function getSelectedGroupByFields(isFullscreen = false) {
+            const containerId = isFullscreen ? 'ganttGroupByOptionsFullscreen' : 'ganttGroupByOptions';
+            const checkboxes = document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`);
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function updateGroupByText() {
+            const selected = getSelectedGroupByFields(false);
+            const textEl = document.getElementById('ganttGroupByText');
+            if (selected.length === 0) {
+                textEl.textContent = 'Select fields...';
+            } else if (selected.length <= 2) {
+                textEl.textContent = selected.map(f => getFieldDisplayName(f)).join(' > ');
+            } else {
+                textEl.textContent = `${selected.length} levels`;
+            }
+        }
+
+        function updateGroupByTextFullscreen() {
+            const selected = getSelectedGroupByFields(true);
+            const textEl = document.getElementById('ganttGroupByTextFullscreen');
+            if (selected.length === 0) {
+                textEl.textContent = 'Select fields...';
+            } else if (selected.length <= 2) {
+                textEl.textContent = selected.map(f => getFieldDisplayName(f)).join(' > ');
+            } else {
+                textEl.textContent = `${selected.length} levels`;
+            }
+        }
+
+        function getFieldDisplayName(field) {
+            const names = {
+                'ProjectID': 'Project ID',
+                'Registry': 'Registry',
+                'Market': 'Market',
+                'Product': 'Product',
+                'ProjectType': 'Project Type',
+                'Protocol': 'Protocol',
+                'Client': 'Client',
+                'Side': 'Side',
+                'OPL_TradeID': 'OPL Trade ID'
+            };
+            return names[field] || field;
+        }
+
+        async function clearAllGroupBy() {
+            document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            updateGroupByText();
+            await onGroupByChange();
+            saveDashboardSettings();
+        }
+
+        async function clearAllGroupByFullscreen() {
+            document.querySelectorAll('#ganttGroupByOptionsFullscreen input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            updateGroupByTextFullscreen();
+            await onGroupByChangeFullscreen();
+            // Sync back to main
+            document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            updateGroupByText();
+            saveDashboardSettings();
+        }
+
+        async function onGroupByCheckboxChange() {
+            updateGroupByText();
+            await onGroupByChange();
+            // Save after async operation completes so filters are updated
+            saveDashboardSettings();
+        }
+
+        async function onGroupByCheckboxChangeFullscreen() {
+            updateGroupByTextFullscreen();
+            await onGroupByChangeFullscreen();
+            // Sync back to main and save
+            const fullscreenFields = getSelectedGroupByFields(true);
+            document.querySelectorAll('#ganttGroupByOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = fullscreenFields.includes(cb.value);
+            });
+            updateGroupByText();
+            saveDashboardSettings();
+        }
+
+        // Filter dropdown functions
+        function toggleFilterDropdown(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            const isActive = dropdown.classList.contains('active');
+
+            // Close all dropdowns first
+            document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('active'));
+
+            if (!isActive) {
+                dropdown.classList.add('active');
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.multi-select-wrapper')) {
+                document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('active'));
+            }
+        });
+
+        function populateFilterOptions(data, isFullscreen = false) {
+            const optionsContainer = document.getElementById(isFullscreen ? 'ganttFilterOptionsFullscreen' : 'ganttFilterOptions');
+            const filterTextEl = document.getElementById(isFullscreen ? 'ganttFilterTextFullscreen' : 'ganttFilterText');
+            const filterSet = isFullscreen ? selectedFiltersFullscreen : selectedFilters;
+
+            if (!data || !data.items || data.items.length === 0) {
+                optionsContainer.innerHTML = '<div style="padding: 10px; color: #999;">No items available</div>';
+                return;
+            }
+
+            // Get unique labels
+            const uniqueLabels = [...new Set(data.items.map(item => item.label))].sort();
+
+            // Clear and reset filters if group changed
+            filterSet.clear();
+            uniqueLabels.forEach(label => filterSet.add(label));
+
+            // Build options HTML
+            optionsContainer.innerHTML = uniqueLabels.map(label => `
+                <div class="multi-select-option">
+                    <input type="checkbox" id="${isFullscreen ? 'fs_' : ''}filter_${encodeURIComponent(label)}"
+                           value="${encodeURIComponent(label)}" checked
+                           onchange="${isFullscreen ? 'onFilterChangeFullscreen' : 'onFilterChange'}(this)">
+                    <label for="${isFullscreen ? 'fs_' : ''}filter_${encodeURIComponent(label)}">${label}</label>
+                </div>
+            `).join('');
+
+            updateFilterText(isFullscreen);
+        }
+
+        function onFilterChange(checkbox) {
+            const label = decodeURIComponent(checkbox.value);
+            if (checkbox.checked) {
+                selectedFilters.add(label);
+            } else {
+                selectedFilters.delete(label);
+            }
+            updateFilterText(false);
+            applyFilterAndRender();
+            saveDashboardSettings();
+        }
+
+        function onFilterChangeFullscreen(checkbox) {
+            const label = decodeURIComponent(checkbox.value);
+            if (checkbox.checked) {
+                selectedFiltersFullscreen.add(label);
+            } else {
+                selectedFiltersFullscreen.delete(label);
+            }
+            updateFilterText(true);
+            applyFilterAndRenderFullscreen();
+            // Sync back to main and save
+            selectedFilters = new Set(selectedFiltersFullscreen);
+            document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                const cbLabel = decodeURIComponent(cb.value);
+                cb.checked = selectedFilters.has(cbLabel);
+            });
+            updateFilterText(false);
+            saveDashboardSettings();
+        }
+
+        function updateFilterText(isFullscreen) {
+            const filterTextEl = document.getElementById(isFullscreen ? 'ganttFilterTextFullscreen' : 'ganttFilterText');
+            const filterSet = isFullscreen ? selectedFiltersFullscreen : selectedFilters;
+            const optionsContainer = document.getElementById(isFullscreen ? 'ganttFilterOptionsFullscreen' : 'ganttFilterOptions');
+            const totalOptions = optionsContainer.querySelectorAll('input[type="checkbox"]').length;
+
+            if (filterSet.size === 0) {
+                filterTextEl.textContent = 'None Selected';
+            } else if (filterSet.size === totalOptions) {
+                filterTextEl.textContent = 'All Items';
+            } else if (filterSet.size <= 2) {
+                filterTextEl.textContent = [...filterSet].join(', ');
+            } else {
+                filterTextEl.textContent = `${filterSet.size} selected`;
+            }
+        }
+
+        function selectAllFilters() {
+            document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+                selectedFilters.add(decodeURIComponent(cb.value));
+            });
+            updateFilterText(false);
+            applyFilterAndRender();
+            saveDashboardSettings();
+        }
+
+        function clearAllFilters() {
+            document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            selectedFilters.clear();
+            updateFilterText(false);
+            applyFilterAndRender();
+            saveDashboardSettings();
+        }
+
+        function selectAllFiltersFullscreen() {
+            document.querySelectorAll('#ganttFilterOptionsFullscreen input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+                selectedFiltersFullscreen.add(decodeURIComponent(cb.value));
+            });
+            updateFilterText(true);
+            applyFilterAndRenderFullscreen();
+            // Sync back to main
+            selectedFilters = new Set(selectedFiltersFullscreen);
+            document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+            });
+            saveDashboardSettings();
+        }
+
+        function clearAllFiltersFullscreen() {
+            document.querySelectorAll('#ganttFilterOptionsFullscreen input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            selectedFiltersFullscreen.clear();
+            updateFilterText(true);
+            applyFilterAndRenderFullscreen();
+            // Sync back to main
+            selectedFilters.clear();
+            document.querySelectorAll('#ganttFilterOptions input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            saveDashboardSettings();
+        }
+
+        function applyFilterAndRender() {
+            if (!cachedGanttDataMain) return;
+
+            const filteredData = {
+                ...cachedGanttDataMain,
+                items: cachedGanttDataMain.items.filter(item => selectedFilters.has(item.label))
+            };
+            renderGanttChart(filteredData);
+        }
+
+        function applyFilterAndRenderFullscreen() {
+            if (!cachedGanttDataMain) return;
+
+            const filteredData = {
+                ...cachedGanttDataMain,
+                items: cachedGanttDataMain.items.filter(item => selectedFiltersFullscreen.has(item.label))
+            };
+            renderGanttChartFullscreen(filteredData);
+        }
+
+        async function onGroupByChange() {
+            let groupByFields = getSelectedGroupByFields(false);
+            if (groupByFields.length === 0) {
+                document.getElementById('ganttContainer').innerHTML =
+                    '<div class="gantt-empty">Please select at least one grouping field</div>';
+                return;
+            }
+            const groupBy = groupByFields.join(',');
+
+            try {
+                const data = await fetchGanttData(groupBy);
+
+                if (data) {
+                    cachedGanttDataMain = data;
+                    populateFilterOptions(data, false);
+                    renderGanttChart(data);
+                } else {
+                    document.getElementById('ganttContainer').innerHTML =
+                        '<div class="gantt-empty">No warranty data available</div>';
+                }
+            } catch (error) {
+                console.error('Error in onGroupByChange:', error);
+                document.getElementById('ganttContainer').innerHTML =
+                    '<div class="gantt-empty">Error loading warranty data</div>';
+            }
+        }
+
+        async function onGroupByChangeFullscreen() {
+            let groupByFields = getSelectedGroupByFields(true);
+            if (groupByFields.length === 0) {
+                document.getElementById('ganttFullscreenBody').innerHTML =
+                    '<div class="gantt-empty">Please select at least one grouping field</div>';
+                return;
+            }
+            const groupBy = groupByFields.join(',');
+
+            try {
+                const data = await fetchGanttData(groupBy);
+
+                if (data) {
+                    cachedGanttDataMain = data;
+                    populateFilterOptions(data, true);
+                    renderGanttChartFullscreen(data);
+                } else {
+                    document.getElementById('ganttFullscreenBody').innerHTML =
+                        '<div class="gantt-empty">No warranty data available</div>';
+                }
+            } catch (error) {
+                console.error('Error in onGroupByChangeFullscreen:', error);
+                document.getElementById('ganttFullscreenBody').innerHTML =
+                    '<div class="gantt-empty">Error loading warranty data</div>';
+            }
+        }
+
+        function calculateWeightedAvgDate(items, minDate, totalDays) {
+            let totalWeight = 0;
+            let weightedSum = 0;
+
+            items.forEach(item => {
+                const startDate = parseDateUTC(item.start);
+                const endDate = parseDateUTC(item.end);
+
+                if (startDate && endDate) {
+                    // Calculate midpoint of warranty period
+                    const midpoint = new Date((startDate.getTime() + endDate.getTime()) / 2);
+                    const dayOffset = Math.round((midpoint - minDate) / (1000 * 60 * 60 * 24));
+
+                    weightedSum += dayOffset * item.volume;
+                    totalWeight += item.volume;
+                }
+            });
+
+            if (totalWeight === 0) return null;
+
+            const avgDayOffset = weightedSum / totalWeight;
+            return (avgDayOffset / totalDays) * 100;
+        }
+
+        // Helper to parse date string to UTC date (avoiding timezone issues)
+        function parseDateUTC(dateStr) {
+            if (!dateStr) return null;
+            // Handle YYYY-MM-DD format
+            const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return new Date(Date.UTC(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3])));
+            }
+            // Handle MM/DD/YYYY format
+            const match2 = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (match2) {
+                return new Date(Date.UTC(parseInt(match2[3]), parseInt(match2[1]) - 1, parseInt(match2[2])));
+            }
+            return null;
+        }
+
+        function renderGanttChart(data) {
+            const container = document.getElementById('ganttContainer');
+            cachedWarrantyData = data;
+
+            if (!data || !data.items || data.items.length === 0) {
+                container.innerHTML = '<div class="gantt-empty">No warranty data available</div>';
+                return;
+            }
+
+            // Parse dates as UTC to avoid timezone issues
+            const minDate = parseDateUTC(data.min_date);
+            const maxDate = parseDateUTC(data.max_date);
+            const today = parseDateUTC(data.today);
+
+            if (!minDate || !maxDate) {
+                container.innerHTML = '<div class="gantt-empty">Invalid date range</div>';
+                return;
+            }
+
+            // Calculate total time span in days
+            const totalDays = Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24));
+
+            // Generate month markers with their day counts and percentages
+            const months = [];
+            let currentYear = minDate.getUTCFullYear();
+            let currentMonthNum = minDate.getUTCMonth();
+
+            while (true) {
+                const monthStart = new Date(Date.UTC(currentYear, currentMonthNum, 1));
+                const nextMonthStart = new Date(Date.UTC(currentYear, currentMonthNum + 1, 1));
+
+                if (monthStart >= maxDate) break;
+
+                const effectiveStart = monthStart < minDate ? minDate : monthStart;
+                const effectiveEnd = nextMonthStart > maxDate ? maxDate : nextMonthStart;
+                const daysInThisMonth = Math.round((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24));
+                const widthPercent = (daysInThisMonth / totalDays) * 100;
+
+                months.push({
+                    date: monthStart,
+                    label: monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }),
+                    days: daysInThisMonth,
+                    widthPercent: widthPercent
+                });
+
+                currentMonthNum++;
+                if (currentMonthNum > 11) {
+                    currentMonthNum = 0;
+                    currentYear++;
+                }
+            }
+
+            // Generate month lines HTML for rows with proper widths
+            const monthLinesHtml = '<div class="gantt-month-lines">' +
+                months.map(m => `<div class="gantt-month-line" style="flex: 0 0 ${m.widthPercent}%; width: ${m.widthPercent}%;"></div>`).join('') +
+                '</div>';
+
+            // Generate body-level month lines with proper widths
+            const bodyMonthLinesHtml = '<div class="gantt-body-month-lines">' +
+                months.map(m => `<div class="gantt-body-month-line" style="flex: 0 0 ${m.widthPercent}%; width: ${m.widthPercent}%;"></div>`).join('') +
+                '</div>';
+
+            // Group items by label for display
+            const groupedItems = {};
+            data.items.forEach(item => {
+                if (!groupedItems[item.label]) {
+                    groupedItems[item.label] = [];
+                }
+                groupedItems[item.label].push(item);
+            });
+
+            // Build HTML
+            let html = '<div class="gantt-chart">';
+
+            // Header with months - use proportional widths
+            html += '<div class="gantt-header">';
+            html += '<div class="gantt-label-header">Item</div>';
+            html += '<div class="gantt-timeline-header">';
+            months.forEach(month => {
+                html += `<div class="gantt-month" style="flex: 0 0 ${month.widthPercent}%; width: ${month.widthPercent}%;">${month.label}</div>`;
+            });
+            html += '</div></div>';
+
+            // Body with rows
+            html += '<div class="gantt-body">';
+            html += bodyMonthLinesHtml;
+
+            Object.keys(groupedItems).sort().forEach(label => {
+                const items = groupedItems[label];
+
+                // Calculate weighted average date for this group
+                const avgPercent = calculateWeightedAvgDate(items, minDate, totalDays);
+
+                html += '<div class="gantt-row">';
+                html += `<div class="gantt-row-label" title="${label}">${label}</div>`;
+                html += '<div class="gantt-row-timeline">';
+                html += monthLinesHtml;
+
+                items.forEach((item, idx) => {
+                    const startDate = parseDateUTC(item.start);
+                    const endDate = parseDateUTC(item.end);
+                    const dataAttrs = `data-label="${encodeURIComponent(label)}" data-start="${item.start || ''}" data-end="${item.end || ''}" data-volume="${item.volume}"`;
+
+                    if (startDate && endDate && startDate <= endDate) {
+                        // Calculate position and width using UTC dates
+                        const startOffset = Math.round((startDate - minDate) / (1000 * 60 * 60 * 24));
+                        const endOffset = Math.round((endDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                        const leftPercent = (startOffset / totalDays) * 100;
+                        const widthPercent = ((endOffset - startOffset) / totalDays) * 100;
+
+                        // Create tooltip text
+                        const tooltipText = `${label}\nStart: ${item.start}\nEnd: ${item.end}\nVolume: ${item.volume}\nClick to view credits`;
+
+                        html += `<div class="gantt-bar ${item.status}"
+                            style="left: ${leftPercent}%; width: ${widthPercent}%;"
+                            title="${tooltipText}" ${dataAttrs}
+                            onclick="showCreditsDialog(this)">${item.volume}</div>`;
+                    }
+                });
+
+                // Add weighted average line
+                if (avgPercent !== null && avgPercent >= 0 && avgPercent <= 100) {
+                    html += `<div class="gantt-avg-line" style="left: ${avgPercent}%;" title="Weighted avg warranty date"></div>`;
+                }
+
+                html += '</div></div>';
+            });
+
+            // Add today line - position relative to timeline area (after 150px label)
+            // Add +1 day to align with end of bars that end today (same logic as bar endOffset)
+            if (today) {
+                const todayOffset = Math.round((today - minDate) / (1000 * 60 * 60 * 24)) + 1;
+                const todayPercent = (todayOffset / totalDays) * 100;
+                if (todayPercent >= 0 && todayPercent <= 100) {
+                    html += `<div class="gantt-today-line" style="left: calc(150px + (100% - 150px) * ${todayPercent / 100})" title="Today"></div>`;
+                }
+            }
+
+            html += '</div></div>';
+
+            container.innerHTML = html;
+        }
+
+        async function updateGanttChart() {
+            let groupByFields = getSelectedGroupByFields(false);
+            // Default to ProjectID if nothing selected
+            if (groupByFields.length === 0) {
+                groupByFields = ['ProjectID'];
+            }
+            const groupBy = groupByFields.join(',');
+
+            try {
+                const data = await fetchGanttData(groupBy);
+
+                if (data) {
+                    cachedGanttDataMain = data;
+                    populateFilterOptions(data, false);
+                    renderGanttChart(data);
+                } else {
+                    document.getElementById('ganttContainer').innerHTML =
+                        '<div class="gantt-empty">No warranty data available</div>';
+                }
+            } catch (error) {
+                console.error('Error in updateGanttChart:', error);
+                document.getElementById('ganttContainer').innerHTML =
+                    '<div class="gantt-empty">Error loading warranty data</div>';
+            }
+        }
+
+        // Fullscreen Gantt Chart Functions
+        let cachedGanttData = null;
+
+        function openGanttFullscreen() {
+            const modal = document.getElementById('ganttFullscreenModal');
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            // Sync the group by selections from main view
+            const mainGroupByFields = getSelectedGroupByFields(false);
+            document.querySelectorAll('#ganttGroupByOptionsFullscreen input[type="checkbox"]').forEach(cb => {
+                cb.checked = mainGroupByFields.includes(cb.value);
+            });
+            updateGroupByTextFullscreen();
+
+            // Sync filters from main view
+            if (cachedGanttDataMain) {
+                populateFilterOptions(cachedGanttDataMain, true);
+                // Sync selected filters
+                selectedFiltersFullscreen = new Set(selectedFilters);
+                // Update checkboxes to match
+                document.querySelectorAll('#ganttFilterOptionsFullscreen input[type="checkbox"]').forEach(cb => {
+                    const label = decodeURIComponent(cb.value);
+                    cb.checked = selectedFiltersFullscreen.has(label);
+                });
+                updateFilterText(true);
+                applyFilterAndRenderFullscreen();
+            } else {
+                onGroupByChangeFullscreen();
+            }
+        }
+
+        function closeGanttFullscreen() {
+            const modal = document.getElementById('ganttFullscreenModal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        async function updateGanttChartFullscreen() {
+            let groupByFields = getSelectedGroupByFields(true);
+            if (groupByFields.length === 0) {
+                groupByFields = ['ProjectID'];
+            }
+            const groupBy = groupByFields.join(',');
+
+            try {
+                const data = await fetchGanttData(groupBy);
+
+                if (data) {
+                    cachedGanttDataMain = data;
+                    populateFilterOptions(data, true);
+                    renderGanttChartFullscreen(data);
+                } else {
+                    document.getElementById('ganttFullscreenBody').innerHTML =
+                        '<div class="gantt-empty">No warranty data available</div>';
+                }
+            } catch (error) {
+                console.error('Error in updateGanttChartFullscreen:', error);
+                document.getElementById('ganttFullscreenBody').innerHTML =
+                    '<div class="gantt-empty">Error loading warranty data</div>';
+            }
+        }
+
+        function renderGanttChartFullscreen(data) {
+            const container = document.getElementById('ganttFullscreenBody');
+
+            if (!data || !data.items || data.items.length === 0) {
+                container.innerHTML = '<div class="gantt-empty">No warranty data available</div>';
+                return;
+            }
+
+            // Parse dates as UTC to avoid timezone issues
+            const minDate = parseDateUTC(data.min_date);
+            const maxDate = parseDateUTC(data.max_date);
+            const today = parseDateUTC(data.today);
+
+            if (!minDate || !maxDate) {
+                container.innerHTML = '<div class="gantt-empty">Invalid date range</div>';
+                return;
+            }
+
+            // Calculate total time span in days
+            const totalDays = Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24));
+
+            // Generate month markers with their day counts and percentages
+            const months = [];
+            let currentYear = minDate.getUTCFullYear();
+            let currentMonthNum = minDate.getUTCMonth();
+
+            while (true) {
+                const monthStart = new Date(Date.UTC(currentYear, currentMonthNum, 1));
+                const nextMonthStart = new Date(Date.UTC(currentYear, currentMonthNum + 1, 1));
+
+                if (monthStart >= maxDate) break;
+
+                const effectiveStart = monthStart < minDate ? minDate : monthStart;
+                const effectiveEnd = nextMonthStart > maxDate ? maxDate : nextMonthStart;
+                const daysInThisMonth = Math.round((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24));
+                const widthPercent = (daysInThisMonth / totalDays) * 100;
+
+                months.push({
+                    date: monthStart,
+                    label: monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }),
+                    days: daysInThisMonth,
+                    widthPercent: widthPercent
+                });
+
+                currentMonthNum++;
+                if (currentMonthNum > 11) {
+                    currentMonthNum = 0;
+                    currentYear++;
+                }
+            }
+
+            // Generate month lines HTML for rows with proper widths
+            const monthLinesHtml = '<div class="gantt-month-lines">' +
+                months.map(m => `<div class="gantt-month-line" style="flex: 0 0 ${m.widthPercent}%; width: ${m.widthPercent}%;"></div>`).join('') +
+                '</div>';
+
+            // Generate body-level month lines with proper widths
+            const bodyMonthLinesHtml = '<div class="gantt-body-month-lines">' +
+                months.map(m => `<div class="gantt-body-month-line" style="flex: 0 0 ${m.widthPercent}%; width: ${m.widthPercent}%;"></div>`).join('') +
+                '</div>';
+
+            // Group items by label for display
+            const groupedItems = {};
+            data.items.forEach(item => {
+                if (!groupedItems[item.label]) {
+                    groupedItems[item.label] = [];
+                }
+                groupedItems[item.label].push(item);
+            });
+
+            // Build HTML
+            let html = '<div class="gantt-chart">';
+
+            // Header with months - use proportional widths
+            html += '<div class="gantt-header">';
+            html += '<div class="gantt-label-header">Item</div>';
+            html += '<div class="gantt-timeline-header">';
+            months.forEach(month => {
+                html += `<div class="gantt-month" style="flex: 0 0 ${month.widthPercent}%; width: ${month.widthPercent}%;">${month.label}</div>`;
+            });
+            html += '</div></div>';
+
+            // Body with rows
+            html += '<div class="gantt-body">';
+            html += bodyMonthLinesHtml;
+
+            Object.keys(groupedItems).sort().forEach(label => {
+                const items = groupedItems[label];
+
+                // Calculate weighted average date for this group
+                const avgPercent = calculateWeightedAvgDate(items, minDate, totalDays);
+
+                html += '<div class="gantt-row">';
+                html += `<div class="gantt-row-label" title="${label}">${label}</div>`;
+                html += '<div class="gantt-row-timeline">';
+                html += monthLinesHtml;
+
+                items.forEach(item => {
+                    const startDate = parseDateUTC(item.start);
+                    const endDate = parseDateUTC(item.end);
+                    const dataAttrs = `data-label="${encodeURIComponent(label)}" data-start="${item.start || ''}" data-end="${item.end || ''}" data-volume="${item.volume}" data-fullscreen="true"`;
+
+                    if (startDate && endDate && startDate <= endDate) {
+                        // Calculate position and width using UTC dates
+                        const startOffset = Math.round((startDate - minDate) / (1000 * 60 * 60 * 24));
+                        const endOffset = Math.round((endDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                        const leftPercent = (startOffset / totalDays) * 100;
+                        const widthPercent = ((endOffset - startOffset) / totalDays) * 100;
+
+                        // Create tooltip text
+                        const tooltipText = `${label}\nStart: ${item.start}\nEnd: ${item.end}\nVolume: ${item.volume}\nClick to view credits`;
+
+                        html += `<div class="gantt-bar ${item.status}"
+                            style="left: ${leftPercent}%; width: ${widthPercent}%;"
+                            title="${tooltipText}" ${dataAttrs}
+                            onclick="showCreditsDialogFullscreen(this)">${item.volume}</div>`;
+                    }
+                });
+
+                // Add weighted average line
+                if (avgPercent !== null && avgPercent >= 0 && avgPercent <= 100) {
+                    html += `<div class="gantt-avg-line" style="left: ${avgPercent}%;" title="Weighted avg warranty date"></div>`;
+                }
+
+                html += '</div></div>';
+            });
+
+            // Add today line - position relative to timeline area (after 200px label)
+            // Add +1 day to align with end of bars that end today (same logic as bar endOffset)
+            const todayOffset = Math.round((today - minDate) / (1000 * 60 * 60 * 24)) + 1;
+            const todayPercent = (todayOffset / totalDays) * 100;
+            if (todayPercent >= 0 && todayPercent <= 100) {
+                html += `<div class="gantt-today-line" style="left: calc(200px + (100% - 200px) * ${todayPercent / 100})" title="Today"></div>`;
+            }
+
+            html += '</div></div>';
+
+            container.innerHTML = html;
+        }
+
+        async function showCreditsDialogFullscreen(barElement) {
+            const label = decodeURIComponent(barElement.dataset.label);
+            const startDate = barElement.dataset.start;
+            const endDate = barElement.dataset.end;
+
+            // Get current group by field from fullscreen dropdown
+            const groupBy = document.getElementById('ganttGroupByFullscreen').value;
+
+            // Fetch warranty data to get matching credits
+            try {
+                const response = await fetch('/api/warranties/get');
+                if (!response.ok) throw new Error('Failed to fetch warranties');
+                const warrantyData = await response.json();
+
+                // Filter credits that match this bar
+                const matchingCredits = warrantyData.data.filter(item => {
+                    const itemGroupValue = item[groupBy] || 'Unknown';
+                    const itemStart = item.Warranty_Start || '';
+                    const itemEnd = item.Warranty_End || '';
+
+                    return itemGroupValue === label &&
+                           itemStart === startDate &&
+                           itemEnd === endDate;
+                });
+
+                // Update dialog title and subtitle
+                document.getElementById('creditsDialogTitle').textContent = label;
+                let subtitle = '';
+                if (startDate && endDate) {
+                    subtitle = `Warranty Period: ${startDate} to ${endDate}`;
+                } else {
+                    subtitle = 'No warranty dates set';
+                }
+                document.getElementById('creditsDialogSubtitle').textContent = subtitle;
+
+                // Group credits by serial range
+                const groupedCredits = groupSerialsByRange(matchingCredits);
+
+                // Populate table
+                const tbody = document.getElementById('creditsDialogBody');
+                if (groupedCredits.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #999;">No credits found</td></tr>';
+                } else {
+                    tbody.innerHTML = groupedCredits.map(group => `
+                        <tr>
+                            <td title="${group.serialRange}">${group.serialRange}</td>
+                            <td><strong>${group.count}</strong></td>
+                            <td>${group.market}</td>
+                            <td>${group.registry}</td>
+                            <td>${group.product}</td>
+                            <td>${group.projectId}</td>
+                            <td>${group.projectName}</td>
+                            <td>${group.projectType}</td>
+                            <td>${group.protocol}</td>
+                            <td>${group.warrantyStart}</td>
+                            <td>${group.warrantyEnd}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Update count
+                document.getElementById('creditsDialogCount').textContent = matchingCredits.length;
+
+                // Show dialog
+                document.getElementById('creditsDialogOverlay').classList.add('active');
+
+            } catch (error) {
+                console.error('Error fetching credits:', error);
+                alert('Failed to load credits data');
+            }
+        }
+
+        // Close fullscreen on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeGanttFullscreen();
+                closeCreditsDialog();
+            }
+        });
+
+        // Credits Dialog Functions
+        function groupSerialsByRange(credits) {
+            // Group credits by common attributes (excluding Serial)
+            const groups = {};
+
+            credits.forEach(credit => {
+                const key = `${credit.Market || ''}|${credit.Registry || ''}|${credit.Product || ''}|${credit.ProjectID || ''}|${credit.ProjectName || ''}|${credit.ProjectType || ''}|${credit.Protocol || ''}|${credit.Warranty_Start || ''}|${credit.Warranty_End || ''}`;
+
+                if (!groups[key]) {
+                    groups[key] = {
+                        serials: [],
+                        market: credit.Market || '-',
+                        registry: credit.Registry || '-',
+                        product: credit.Product || '-',
+                        projectId: credit.ProjectID || '-',
+                        projectName: credit.ProjectName || '-',
+                        projectType: credit.ProjectType || '-',
+                        protocol: credit.Protocol || '-',
+                        warrantyStart: credit.Warranty_Start || '-',
+                        warrantyEnd: credit.Warranty_End || '-'
+                    };
+                }
+                groups[key].serials.push(credit.Serial);
+            });
+
+            // Convert to array and create serial ranges
+            return Object.values(groups).map(group => {
+                // Sort serials
+                const sortedSerials = group.serials.sort();
+                const ranges = [];
+                let rangeStart = null;
+                let rangeEnd = null;
+                let prevSerial = null;
+
+                // Try to detect consecutive serials
+                sortedSerials.forEach((serial, idx) => {
+                    if (rangeStart === null) {
+                        rangeStart = serial;
+                        rangeEnd = serial;
+                    } else {
+                        // Check if this serial is "consecutive" to the previous one
+                        // Simple heuristic: if they share a common prefix and differ only in suffix numbers
+                        const isConsecutive = areConsecutiveSerials(prevSerial, serial);
+
+                        if (isConsecutive) {
+                            rangeEnd = serial;
+                        } else {
+                            // Save current range and start new one
+                            if (rangeStart === rangeEnd) {
+                                ranges.push(rangeStart);
+                            } else {
+                                ranges.push(`${rangeStart} - ${rangeEnd}`);
+                            }
+                            rangeStart = serial;
+                            rangeEnd = serial;
+                        }
+                    }
+                    prevSerial = serial;
+                });
+
+                // Don't forget the last range
+                if (rangeStart !== null) {
+                    if (rangeStart === rangeEnd) {
+                        ranges.push(rangeStart);
+                    } else {
+                        ranges.push(`${rangeStart} - ${rangeEnd}`);
+                    }
+                }
+
+                return {
+                    serialRange: ranges.length > 3 ? `${ranges[0]}, ... (${ranges.length} ranges)` : ranges.join(', '),
+                    count: group.serials.length,
+                    market: group.market,
+                    registry: group.registry,
+                    product: group.product,
+                    projectId: group.projectId,
+                    projectName: group.projectName,
+                    projectType: group.projectType,
+                    protocol: group.protocol,
+                    warrantyStart: group.warrantyStart,
+                    warrantyEnd: group.warrantyEnd
+                };
+            });
+        }
+
+        function areConsecutiveSerials(serial1, serial2) {
+            if (!serial1 || !serial2) return false;
+
+            // Extract numeric suffixes
+            const match1 = serial1.match(/^(.+?)(\d+)$/);
+            const match2 = serial2.match(/^(.+?)(\d+)$/);
+
+            if (match1 && match2 && match1[1] === match2[1]) {
+                const num1 = parseInt(match1[2]);
+                const num2 = parseInt(match2[2]);
+                return num2 === num1 + 1;
+            }
+            return false;
+        }
+
+        async function showCreditsDialog(barElement) {
+            const label = decodeURIComponent(barElement.dataset.label);
+            const startDate = barElement.dataset.start;
+            const endDate = barElement.dataset.end;
+            const volume = barElement.dataset.volume;
+
+            // Get current group by field
+            const groupBy = document.getElementById('ganttGroupBy').value;
+
+            // Fetch warranty data to get matching credits
+            try {
+                const response = await fetch('/api/warranties/get');
+                if (!response.ok) throw new Error('Failed to fetch warranties');
+                const warrantyData = await response.json();
+
+                // Filter credits that match this bar
+                const matchingCredits = warrantyData.data.filter(item => {
+                    const itemGroupValue = item[groupBy] || 'Unknown';
+                    const itemStart = item.Warranty_Start || '';
+                    const itemEnd = item.Warranty_End || '';
+
+                    return itemGroupValue === label &&
+                           itemStart === startDate &&
+                           itemEnd === endDate;
+                });
+
+                // Update dialog title and subtitle
+                document.getElementById('creditsDialogTitle').textContent = label;
+                let subtitle = '';
+                if (startDate && endDate) {
+                    subtitle = `Warranty Period: ${startDate} to ${endDate}`;
+                } else {
+                    subtitle = 'No warranty dates set';
+                }
+                document.getElementById('creditsDialogSubtitle').textContent = subtitle;
+
+                // Group credits by serial range
+                const groupedCredits = groupSerialsByRange(matchingCredits);
+
+                // Populate table
+                const tbody = document.getElementById('creditsDialogBody');
+                if (groupedCredits.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #999;">No credits found</td></tr>';
+                } else {
+                    tbody.innerHTML = groupedCredits.map(group => `
+                        <tr>
+                            <td title="${group.serialRange}">${group.serialRange}</td>
+                            <td><strong>${group.count}</strong></td>
+                            <td>${group.market}</td>
+                            <td>${group.registry}</td>
+                            <td>${group.product}</td>
+                            <td>${group.projectId}</td>
+                            <td>${group.projectName}</td>
+                            <td>${group.projectType}</td>
+                            <td>${group.protocol}</td>
+                            <td>${group.warrantyStart}</td>
+                            <td>${group.warrantyEnd}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Update count
+                document.getElementById('creditsDialogCount').textContent = matchingCredits.length;
+
+                // Show dialog
+                document.getElementById('creditsDialogOverlay').classList.add('active');
+                document.body.style.overflow = 'hidden';
+
+            } catch (error) {
+                console.error('Error fetching credits:', error);
+                alert('Failed to load credits data');
+            }
+        }
+
+        function closeCreditsDialog(event) {
+            // If called from overlay click, only close if clicking the overlay itself
+            if (event && event.target !== event.currentTarget) return;
+
+            document.getElementById('creditsDialogOverlay').classList.remove('active');
+            if (!document.getElementById('ganttFullscreenModal').classList.contains('active')) {
+                document.body.style.overflow = '';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Carbon IMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="home-box">
+            <header class="home-header">
+                <h1>Welcome to Carbon IMS</h1>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="welcome-section">
+                <h2>Hello, {{ display_name }}!</h2>
+                <p>You have successfully logged in to Carbon IMS.</p>
+            </div>
+
+            <div class="dashboard-grid">
+                <a href="{{ url_for('dashboard') }}" style="text-decoration: none;">
+                    <div class="dashboard-card">
+                        <h3>Dashboard</h3>
+                        <p>View your system overview and analytics</p>
+                    </div>
+                </a>
+
+                <a href="{{ url_for('inventory') }}" style="text-decoration: none;">
+                    <div class="dashboard-card">
+                        <h3>Manage Inventory</h3>
+                        <p>Manage portfolio of environmental assets</p>
+                    </div>
+                </a>
+
+                <a href="{{ url_for('warranties') }}" style="text-decoration: none;">
+                    <div class="dashboard-card">
+                        <h3>Warranties</h3>
+                        <p>Manage warranty information and dates</p>
+                    </div>
+                </a>
+
+                {% if user_role == 'admin' %}
+                <a href="{{ url_for('manage_users') }}" style="text-decoration: none;">
+                    <div class="dashboard-card">
+                        <h3>User Management</h3>
+                        <p>Manage user access and permissions</p>
+                    </div>
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('settings') }}" style="text-decoration: none;">
+                    <div class="dashboard-card">
+                        <h3>Settings</h3>
+                        <p>Configure your account and preferences</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div id="app-footer"></div>
+    <script>
+        (function() {
+            const _0x3a4b = ['QXBwbGljYXRpb24=', 'Q3JlYXRlZCBCeSBNaWtlIENoZXVuZw==', 'YXBwLWZvb3Rlcg==', 'Z2V0RWxlbWVudEJ5SWQ=', 'aW5uZXJIVE1M', 'c3R5bGU=', 'Y3NzVGV4dA=='];
+            const _0x1f = window[atob('ZG9jdW1lbnQ=')];
+            const _0x2e = _0x1f[atob(_0x3a4b[3])](atob(_0x3a4b[2]));
+            if (_0x2e) {
+                _0x2e[atob(_0x3a4b[4])] = atob(_0x3a4b[1]);
+                _0x2e[atob(_0x3a4b[5])][atob(_0x3a4b[6])] = 'position:fixed;bottom:20px;right:20px;background:#2c3e50;color:#ecf0f1;text-align:right;padding:8px 16px;font-size:11px;font-family:Arial,sans-serif;z-index:9999;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.2);letter-spacing:0.5px;';
+            }
+        })();
+    </script>
+</body>
+</html>

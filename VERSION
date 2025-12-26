@@ -1,0 +1,20 @@
+Carbon IMS - Inventory Management System
+Version: 1.0.0
+Release Date: December 22, 2025
+Created By: Mike Cheung
+
+Build Information:
+- Python: 3.8+
+- Flask: 3.0.0
+- Database: SQLite3
+
+Change Log:
+- Initial release
+- User management with role-based access
+- Inventory management with CRUD operations
+- Warranty management with serial linking
+- Automated backup and restore
+- Advanced filtering and sorting
+- Pagination support
+- Timezone support (EST)
+- Password-protected operations
