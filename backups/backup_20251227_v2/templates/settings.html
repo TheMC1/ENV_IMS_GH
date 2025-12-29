@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Carbon IMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="users-box">
+            <header class="home-header">
+                <h1>Settings</h1>
+                <div class="header-actions">
+                    <a href="{{ url_for('home') }}" class="btn-secondary">Back to Home</a>
+                    <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="user-management-section">
+                <div class="section-header">
+                    <h2>Account Settings</h2>
+                </div>
+
+                <form method="POST" action="{{ url_for('settings') }}">
+                    <div class="form-card">
+                        <h3 style="margin-bottom: 20px; color: #333;">Profile Information</h3>
+
+                        <div class="form-group">
+                            <label for="username">Username (cannot be changed)</label>
+                            <input type="text" id="username" value="{{ user['username'] }}" disabled style="background-color: #f0f0f0; cursor: not-allowed;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="display_name">Display Name</label>
+                            <input
+                                type="text"
+                                id="display_name"
+                                name="display_name"
+                                value="{{ user['display_name'] or '' }}"
+                                placeholder="Enter your display name"
+                            >
+                            <small style="color: #666; font-size: 13px;">This is the name that will be displayed when you log in.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-card">
+                        <h3 style="margin-bottom: 20px; color: #333;">Change Password</h3>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Leave password fields blank if you don't want to change your password.</p>
+
+                        <div class="form-group">
+                            <label for="current_password">Current Password</label>
+                            <input
+                                type="password"
+                                id="current_password"
+                                name="current_password"
+                                autocomplete="current-password"
+                            >
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="new_password">New Password</label>
+                                <input
+                                    type="password"
+                                    id="new_password"
+                                    name="new_password"
+                                    autocomplete="new-password"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="confirm_password">Confirm New Password</label>
+                                <input
+                                    type="password"
+                                    id="confirm_password"
+                                    name="confirm_password"
+                                    autocomplete="new-password"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-card">
+                        <h3 style="margin-bottom: 20px; color: #333;">Inventory View Preferences</h3>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Set your default view preferences for the Inventory Management page.</p>
+
+                        <div class="form-group">
+                            <label for="view_mode">Default View Mode</label>
+                            <select id="view_mode" name="view_mode">
+                                <option value="summarized" {% if user['view_mode'] == 'summarized' %}selected{% endif %}>Summarized</option>
+                                <option value="detailed" {% if user['view_mode'] == 'detailed' %}selected{% endif %}>Detailed</option>
+                            </select>
+                            <small style="color: #666; font-size: 13px;">Choose how you want to view inventory data by default.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="custody_view">Default Custody View</label>
+                            <select id="custody_view" name="custody_view">
+                                <option value="all" {% if user['custody_view'] == 'all' %}selected{% endif %}>Show All</option>
+                                <option value="true" {% if user['custody_view'] == 'true' %}selected{% endif %}>In Custody</option>
+                                <option value="false" {% if user['custody_view'] == 'false' %}selected{% endif %}>Available</option>
+                            </select>
+                            <small style="color: #666; font-size: 13px;">Choose which custody status to display by default.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="rows_per_page">Default Rows Per Page</label>
+                            <select id="rows_per_page" name="rows_per_page">
+                                <option value="all" {% if user['rows_per_page'] == 'all' %}selected{% endif %}>Show All</option>
+                                <option value="25" {% if user['rows_per_page'] == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if user['rows_per_page'] == '50' %}selected{% endif %}>50</option>
+                                <option value="100" {% if user['rows_per_page'] == '100' %}selected{% endif %}>100</option>
+                                <option value="250" {% if user['rows_per_page'] == '250' %}selected{% endif %}>250</option>
+                            </select>
+                            <small style="color: #666; font-size: 13px;">Choose how many rows to display per page by default.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-card">
+                        <h3 style="margin-bottom: 20px; color: #333;">Warranty View Preferences</h3>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Set your default view preferences for the Warranties page.</p>
+
+                        <div class="form-group">
+                            <label for="warranty_view_mode">Default View Mode</label>
+                            <select id="warranty_view_mode" name="warranty_view_mode">
+                                <option value="summarized" {% if user['warranty_view_mode'] == 'summarized' %}selected{% endif %}>Summarized</option>
+                                <option value="raw" {% if user['warranty_view_mode'] == 'raw' %}selected{% endif %}>By Serial</option>
+                            </select>
+                            <small style="color: #666; font-size: 13px;">Choose how you want to view warranty data by default.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="warranty_custody_view">Default Custody View</label>
+                            <select id="warranty_custody_view" name="warranty_custody_view">
+                                <option value="all" {% if user['warranty_custody_view'] == 'all' %}selected{% endif %}>Show All</option>
+                                <option value="true" {% if user['warranty_custody_view'] == 'true' %}selected{% endif %}>In Custody</option>
+                                <option value="false" {% if user['warranty_custody_view'] == 'false' %}selected{% endif %}>Available</option>
+                            </select>
+                            <small style="color: #666; font-size: 13px;">Choose which custody status to display by default for warranties.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="warranty_rows_per_page">Default Rows Per Page</label>
+                            <select id="warranty_rows_per_page" name="warranty_rows_per_page">
+                                <option value="all" {% if user['warranty_rows_per_page'] == 'all' %}selected{% endif %}>Show All</option>
+                                <option value="25" {% if user['warranty_rows_per_page'] == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if user['warranty_rows_per_page'] == '50' %}selected{% endif %}>50</option>
+                                <option value="100" {% if user['warranty_rows_per_page'] == '100' %}selected{% endif %}>100</option>
+                                <option value="250" {% if user['warranty_rows_per_page'] == '250' %}selected{% endif %}>250</option>
+                            </select>
+                            <small style="color: #666; font-size: 13px;">Choose how many rows to display per page by default.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-success">Save Changes</button>
+                        <a href="{{ url_for('home') }}" class="btn-secondary" style="text-decoration: none; display: inline-block; text-align: center;">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="app-footer"></div>
+    <script>
+        (function() {
+            const _0x3a4b = ['QXBwbGljYXRpb24=', 'Q3JlYXRlZCBCeSBNaWtlIENoZXVuZw==', 'YXBwLWZvb3Rlcg==', 'Z2V0RWxlbWVudEJ5SWQ=', 'aW5uZXJIVE1M', 'c3R5bGU=', 'Y3NzVGV4dA=='];
+            const _0x1f = window[atob('ZG9jdW1lbnQ=')];
+            const _0x2e = _0x1f[atob(_0x3a4b[3])](atob(_0x3a4b[2]));
+            if (_0x2e) {
+                _0x2e[atob(_0x3a4b[4])] = atob(_0x3a4b[1]);
+                _0x2e[atob(_0x3a4b[5])][atob(_0x3a4b[6])] = 'position:fixed;bottom:20px;right:20px;background:#2c3e50;color:#ecf0f1;text-align:right;padding:8px 16px;font-size:11px;font-family:Arial,sans-serif;z-index:9999;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.2);letter-spacing:0.5px;';
+            }
+        })();
+    </script>
+</body>
+</html>

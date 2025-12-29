@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Management - Carbon IMS</title>
+    <title>Warranties - Carbon IMS</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         body {
@@ -420,7 +420,7 @@
     <div class="container">
         <div class="inventory-box">
             <header class="home-header">
-                <h1>Inventory Management</h1>
+                <h1>Warranties</h1>
                 <div class="header-actions">
                     <a href="{{ url_for('home') }}" class="btn-secondary">Back to Home</a>
                     <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
@@ -451,12 +451,8 @@
                         <button class="btn-discard" id="discardBtn" onclick="discardChanges()" disabled>Discard Changes</button>
                         <button class="btn-commit" id="commitBtn" onclick="showCommitSummary()" disabled>Save Changes</button>
                         {% endif %}
-                        {% if user_role == 'admin' %}
-                        <button class="btn-secondary" onclick="showBackups()">View Backups</button>
-                        {% endif %}
                         {% if user_role != 'ops' %}
-                        <button class="btn-primary btn-add" onclick="addNewRow()">Add New Item</button>
-                        <button class="btn-danger" onclick="showBulkDelete()">Bulk Delete</button>
+                        <button class="btn-primary btn-add" onclick="showAssignWarranty()">Assign Warranty</button>
                         {% endif %}
                     </div>
                 </div>
@@ -488,7 +484,6 @@
                     <div class="pagination-controls">
                         <button class="btn-primary" onclick="showAdvancedSort()" style="padding: 8px 16px; font-size: 14px; white-space: nowrap;">Advanced Sort</button>
                         <button class="btn-primary" onclick="clearFilters()" style="padding: 8px 16px; font-size: 14px; white-space: nowrap;">Clear Filters</button>
-                        <button class="btn-primary" onclick="exportToExcel()" style="padding: 8px 16px; font-size: 14px; white-space: nowrap;">Export to Excel</button>
                         <button id="prevPage" onclick="changePage(-1)" disabled>Previous</button>
                         <div id="pageNavigation" style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px;">
                             <span style="font-size: 14px;">Page</span>
@@ -549,6 +544,84 @@
                     <div class="modal-body">
                         <div id="backupSummaryContent" class="summary-list">
                             <!-- Summary will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assign Warranty Modal -->
+            <div id="assignWarrantyModal" class="modal">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div class="modal-header">
+                        <h3>Assign Warranty</h3>
+                        <span class="close" onclick="closeAssignWarranty()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <p style="color: #666; margin-bottom: 20px;">
+                            Enter serial numbers or ranges to assign warranty information. The warranty fields will be applied to all matching items.
+                        </p>
+                        <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+                            <strong>Examples:</strong><br>
+                            • Single: AB133311<br>
+                            • Range: AB133311-AB133315<br>
+                            • Multiple: AB133311, AB133315, AB133320-AB133325
+                        </p>
+
+                        <div class="form-group">
+                            <label for="warrantySerialInput">Serial Numbers / Ranges:</label>
+                            <textarea id="warrantySerialInput" rows="3" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px; font-family: monospace;" placeholder="AB133311, AB133315-AB133320, A2XCB1356"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="buyTradeId">Buy_TradeID:</label>
+                            <input type="text" id="buyTradeId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Buy Trade ID">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="buyClient">Buy_Client:</label>
+                            <input type="text" id="buyClient" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Buy Client">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="buyStart">Buy_Start:</label>
+                            <input type="date" id="buyStart" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="buyEnd">Buy_End:</label>
+                            <input type="date" id="buyEnd" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellTradeId">Sell_TradeID:</label>
+                            <input type="text" id="sellTradeId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Sell Trade ID">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellClient">Sell_Client:</label>
+                            <input type="text" id="sellClient" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;" placeholder="Enter Sell Client">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellStart">Sell_Start:</label>
+                            <input type="date" id="sellStart" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sellEnd">Sell_End:</label>
+                            <input type="date" id="sellEnd" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;">
+                        </div>
+
+                        <div id="warrantyAssignPreview" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #e0e0e0; display: none;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;">Preview:</h4>
+                            <p id="warrantyAssignCount" style="margin: 0 0 10px 0; font-weight: 600; color: #28a745;"></p>
+                            <div id="warrantyAssignList" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+                        </div>
+
+                        <div class="form-actions" style="justify-content: flex-end; margin-top: 20px;">
+                            <button class="btn-secondary" onclick="closeAssignWarranty()">Cancel</button>
+                            <button class="btn-primary" onclick="previewWarrantyAssignment()">Preview</button>
+                            <button class="btn-success" id="confirmAssignWarrantyBtn" onclick="confirmWarrantyAssignment()" style="display: none;">Assign Warranty</button>
                         </div>
                     </div>
                 </div>
@@ -661,47 +734,6 @@
                 </div>
             </div>
 
-            <!-- Bulk Delete Modal -->
-            <div id="bulkDeleteModal" class="modal">
-                <div class="modal-content" style="max-width: 600px;">
-                    <div class="modal-header">
-                        <h3>Bulk Delete by Serial Range</h3>
-                        <span class="close" onclick="closeBulkDelete()">&times;</span>
-                    </div>
-                    <div class="modal-body">
-                        <p style="color: #666; margin-bottom: 20px;">
-                            Enter serial numbers or ranges to delete. You can enter multiple values separated by commas.
-                        </p>
-                        <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
-                            <strong>Examples:</strong><br>
-                            • Single: AB133311<br>
-                            • Range: AB133311-AB133315<br>
-                            • Multiple: AB133311, AB133315, AB133320-AB133325
-                        </p>
-                        <div class="form-group">
-                            <label for="bulkDeleteInput">Serial Numbers / Ranges:</label>
-                            <textarea id="bulkDeleteInput" rows="4" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px; font-family: monospace;" placeholder="AB133311, AB133315-AB133320, A2XCB1356"></textarea>
-                        </div>
-                        <div id="bulkDeletePreview" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #e0e0e0; display: none;">
-                            <h4 style="margin: 0 0 10px 0; color: #333;">Preview:</h4>
-                            <p id="bulkDeleteCount" style="margin: 0 0 10px 0; font-weight: 600; color: #dc3545;"></p>
-                            <div id="bulkDeleteList" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 13px;"></div>
-                        </div>
-                        <div id="bulkDeletePasswordSection" style="margin-top: 20px; display: none;">
-                            <div class="form-group">
-                                <label for="bulkDeletePassword" style="font-weight: 600; color: #dc3545;">Confirm Password to Delete:</label>
-                                <input type="password" id="bulkDeletePassword" placeholder="Enter your password" style="width: 100%; padding: 12px; border: 2px solid #dc3545; border-radius: 5px; font-size: 14px;">
-                            </div>
-                        </div>
-                        <div class="form-actions" style="justify-content: flex-end; margin-top: 20px;">
-                            <button class="btn-secondary" onclick="closeBulkDelete()">Cancel</button>
-                            <button class="btn-primary" onclick="previewBulkDelete()">Preview</button>
-                            <button class="btn-danger" id="confirmBulkDeleteBtn" onclick="confirmBulkDelete()" style="display: none;">Delete Items</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Delete Row Confirmation Modal -->
             <div id="deleteRowModal" class="modal">
                 <div class="modal-content" style="max-width: 500px;">
@@ -711,7 +743,7 @@
                     </div>
                     <div class="modal-body">
                         <p style="color: #666; margin-bottom: 20px;">
-                            Are you sure you want to delete this item?
+                            Are you sure you want to delete this warranty?
                         </p>
                         <div id="deleteRowInfo" style="padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #e0e0e0; margin-bottom: 20px;">
                             <!-- Item info will be populated here -->
@@ -722,7 +754,7 @@
                         </div>
                         <div class="form-actions" style="justify-content: flex-end; margin-top: 20px;">
                             <button class="btn-secondary" onclick="closeDeleteRowModal()">Cancel</button>
-                            <button class="btn-danger" onclick="confirmDeleteRow()">Delete Item</button>
+                            <button class="btn-danger" onclick="confirmDeleteRow()">Delete Warranty</button>
                         </div>
                     </div>
                 </div>
@@ -740,6 +772,7 @@
             deleted: []    // array of row_indexes
         };
         let nextTempId = -1; // For temporary IDs for new rows
+        let rowToDelete = null; // Track which row is being deleted
 
         // User role for access control
         const userRole = '{{ user_role }}';
@@ -998,18 +1031,18 @@
             detectSerialColumn();
             const serialColumn = headers[serialColumnIndex];
 
-            // Group by all fields except serial column
+            // Group by warranty fields: Buy_TradeID, Buy_Client, Buy_Start, Buy_End, Sell_TradeID, Sell_Client, Sell_Start, Sell_End
+            // Plus consecutive serials within each group
             const groups = {};
 
             data.forEach(row => {
-                // Create a key from all fields except serial
+                // Create a key from warranty fields only
                 // Normalize values (trim and lowercase) for better grouping
+                const warrantyFields = ['Buy_TradeID', 'Buy_Client', 'Buy_Start', 'Buy_End', 'Sell_TradeID', 'Sell_Client', 'Sell_Start', 'Sell_End'];
                 const keyParts = [];
-                headers.forEach((header, idx) => {
-                    if (idx !== serialColumnIndex) {
-                        const value = (row[header] || '').toString().trim().toLowerCase();
-                        keyParts.push(value);
-                    }
+                warrantyFields.forEach(field => {
+                    const value = (row[field] || '').toString().trim().toLowerCase();
+                    keyParts.push(value);
                 });
                 const groupKey = keyParts.join('|||');
 
@@ -1019,7 +1052,9 @@
                         serialToRows: {}, // Map serial -> array of row indices
                         serials: new Set() // Use Set to avoid duplicates
                     };
-                    // Store the common field values (use original case/formatting for display)
+                    // Store all field values from the first row in this group
+                    // Note: Since grouping is only by warranty fields, inventory fields
+                    // (Market, Registry, Product, etc.) will show values from the first row
                     headers.forEach((header, idx) => {
                         if (idx !== serialColumnIndex) {
                             groups[groupKey].fields[header] = row[header];
@@ -1150,10 +1185,8 @@
             renderTable();
         }
 
-        // Load inventory data on page load
+        // Load warranty data on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // columnFilters is already initialized from saved_filters
-
             // Set UI elements to match user preferences
             const viewModeSelect = document.getElementById('viewMode');
             if (viewModeSelect) {
@@ -1233,8 +1266,8 @@
 
         async function loadInventory() {
             try {
-                console.log('Loading inventory data...');
-                const response = await fetch('/api/inventory/get');
+                console.log('Loading warranties data...');
+                const response = await fetch('/api/warranties/get');
                 console.log('Response status:', response.status);
 
                 if (!response.ok) {
@@ -1246,7 +1279,7 @@
 
                 if (data.error) {
                     console.error('API returned error:', data.error);
-                    showAlert('Error loading inventory: ' + data.error, 'error');
+                    showAlert('Error loading warranties: ' + data.error, 'error');
                     return;
                 }
 
@@ -1266,10 +1299,10 @@
                 updateChangesIndicator();
 
                 renderTable();
-                console.log('Inventory loaded and rendered successfully');
+                console.log('Warranties loaded and rendered successfully');
             } catch (error) {
-                console.error('Error:', error);
-                showAlert('Failed to load inventory data', 'error');
+                console.error('Error loading warranties:', error);
+                showAlert('Failed to load warranties data', 'error');
             }
         }
 
@@ -1374,9 +1407,9 @@
 
             // Update row count label - always show underlying row count
             if (filteredUnderlyingRows !== undefined && filteredUnderlyingRows < totalUnderlyingRows) {
-                rowCountInfo.textContent = `Total Inventory: ${filteredUnderlyingRows} of ${totalUnderlyingRows}`;
+                rowCountInfo.textContent = `Total Warranties: ${filteredUnderlyingRows} of ${totalUnderlyingRows}`;
             } else {
-                rowCountInfo.textContent = `Total Inventory: ${totalUnderlyingRows}`;
+                rowCountInfo.textContent = `Total Warranties: ${totalUnderlyingRows}`;
             }
 
             if (rowsPerPage === 'all') {
@@ -1418,7 +1451,7 @@
             // Filter row
             let filterRow = '<tr class="filter-row">';
             headers.forEach(header => {
-                filterRow += `<td><input type="text" name="table-filter-${header}" placeholder="Filter..." value="${columnFilters[header] || ''}" onchange="updateFilter('${header}', this.value)" autocomplete="off"></td>`;
+                filterRow += `<td><input type="text" placeholder="Filter..." value="${columnFilters[header] || ''}" onchange="updateFilter('${header}', this.value)"></td>`;
             });
             filterRow += '<td></td></tr>';
 
@@ -1437,7 +1470,7 @@
                 return row;
             });
 
-            // Track total underlying rows before summarization
+            // Track total underlying rows BEFORE summarization
             const totalUnderlyingRows = allRows.length;
 
             // Apply summarization if in summarized view mode
@@ -1451,18 +1484,17 @@
             // Apply sorting
             allRows = applySorting(allRows);
 
+            const totalRows = allRows.length;
+
             // Calculate filtered underlying row count
             let filteredUnderlyingRows;
             if (viewMode === 'summarized') {
-                // Sum up all underlying rows from filtered summarized rows
                 filteredUnderlyingRows = allRows.reduce((sum, row) => {
                     return sum + (row._underlying_rows ? row._underlying_rows.length : 1);
                 }, 0);
             } else {
                 filteredUnderlyingRows = allRows.length;
             }
-
-            const totalRows = allRows.length;
 
             // Apply pagination
             let displayRows = allRows;
@@ -1513,8 +1545,11 @@
                     const td = document.createElement('td');
                     const isSerialColumn = headerIdx === serialColumnIndex;
 
-                    // Make summarized rows editable except for serial column, and only if not read-only
-                    const canEdit = !isReadOnly && !isDeleted && (!isSummarized || !isSerialColumn);
+                    // Only warranty fields are editable: Buy_Start, Buy_End, Buy_TradeID, Buy_Client, Sell_Start, Sell_End, Sell_TradeID, Sell_Client
+                    // All other fields come from inventory and are read-only
+                    const editableFields = ['Buy_Start', 'Buy_End', 'Buy_TradeID', 'Buy_Client', 'Sell_Start', 'Sell_End', 'Sell_TradeID', 'Sell_Client'];
+                    const isWarrantyField = editableFields.includes(header);
+                    const canEdit = !isReadOnly && !isDeleted && isWarrantyField && (!isSummarized || !isSerialColumn);
                     td.className = canEdit ? 'editable' : '';
                     td.setAttribute('data-field', header);
 
@@ -1578,7 +1613,7 @@
         }
 
         function saveFiltersToServer() {
-            fetch('/api/settings/inventory', {
+            fetch('/api/settings/warranties', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ columnFilters: columnFilters })
@@ -1590,76 +1625,6 @@
             currentPage = 1;
             renderTable();
             saveFiltersToServer();
-        }
-
-        function exportToExcel() {
-            // Get filtered data
-            let allRows = [...inventoryData, ...pendingChanges.added];
-            allRows = allRows.map(row => {
-                const rowIndex = row._row_index;
-                if (pendingChanges.modified[rowIndex]) {
-                    return { ...row, ...pendingChanges.modified[rowIndex] };
-                }
-                return row;
-            });
-
-            // Apply summarization if in summarized view mode
-            if (viewMode === 'summarized') {
-                allRows = summarizeData(allRows);
-            }
-
-            const filteredData = applyFilters(allRows);
-
-            if (filteredData.length === 0) {
-                showAlert('No data to export', 'warning');
-                return;
-            }
-
-            // Get visible headers (exclude internal fields)
-            const exportHeaders = headers.filter(h => !h.startsWith('_'));
-
-            // For summarized view, add a Count column
-            const finalHeaders = viewMode === 'summarized'
-                ? [...exportHeaders, 'Count']
-                : exportHeaders;
-
-            // Create CSV content
-            const escapeCSV = (value) => {
-                if (value === null || value === undefined) return '';
-                const str = String(value);
-                if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-                    return '"' + str.replace(/"/g, '""') + '"';
-                }
-                return str;
-            };
-
-            let csv = finalHeaders.map(escapeCSV).join(',') + '\n';
-
-            filteredData.forEach(row => {
-                const rowData = exportHeaders.map(header => escapeCSV(row[header]));
-                // Add count for summarized view
-                if (viewMode === 'summarized') {
-                    const count = row._underlying_rows ? row._underlying_rows.length : 1;
-                    rowData.push(count);
-                }
-                csv += rowData.join(',') + '\n';
-            });
-
-            // Create and download file
-            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            const timestamp = new Date().toISOString().slice(0, 10);
-            const viewSuffix = viewMode === 'summarized' ? '_summarized' : '';
-            link.setAttribute('download', `inventory_export${viewSuffix}_${timestamp}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            showAlert(`Exported ${filteredData.length} records to Excel`, 'success');
         }
 
         function changeRowsPerPage() {
@@ -1703,6 +1668,13 @@
             }
         }
 
+        // Date columns that require YYYY-MM-DD format
+        const dateColumns = ['Buy_Start', 'Buy_End', 'Sell_Start', 'Sell_End'];
+
+        function isDateColumn(field) {
+            return dateColumns.includes(field);
+        }
+
         function isValidDateFormat(value) {
             if (!value || value.trim() === '') return true; // Allow empty values
             const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1724,7 +1696,7 @@
             const field = cell.getAttribute('data-field');
             const row = cell.parentElement;
             const rowIndex = parseInt(row.getAttribute('data-row-index'));
-            const isDate = columnTypes[field] === 'date';
+            const isDate = isDateColumn(field);
 
             // Create input element
             const input = document.createElement('input');
@@ -1781,7 +1753,7 @@
             const row = cell.parentElement;
             const underlyingRowsStr = row.getAttribute('data-underlying-rows');
             const underlyingRows = JSON.parse(underlyingRowsStr || '[]');
-            const isDate = columnTypes[field] === 'date';
+            const isDate = isDateColumn(field);
 
             // Create input element
             const input = document.createElement('input');
@@ -1828,8 +1800,6 @@
             });
         }
 
-        let rowToDelete = null;
-
         function deleteRow(rowIndex) {
             if (isReadOnly) {
                 showAlert('You do not have permission to delete items. Your role is read-only.', 'warning');
@@ -1845,7 +1815,7 @@
 
             // Populate the modal with item info
             const infoDiv = document.getElementById('deleteRowInfo');
-            const serialColumn = headers[serialColumnIndex];
+            const serialColumn = 'Serial';
             const serial = row[serialColumn] || 'N/A';
 
             infoDiv.innerHTML = `
@@ -1895,7 +1865,7 @@
                     trackDeletion(rowToDelete);
                     renderTable();
                     closeDeleteRowModal();
-                    showAlert('Item marked for deletion. Click "Save Changes" to commit.', 'success');
+                    showAlert('Warranty marked for deletion. Click "Save Changes" to commit.', 'success');
                 } else {
                     showAlert('Incorrect password', 'error');
                 }
@@ -2354,14 +2324,14 @@
                 });
 
                 // Send batch commit
-                const response = await fetch('/api/inventory/commit-batch', {
+                const response = await fetch('/api/warranties/commit-batch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         summary: changeSummary,
-                        modifications: modifications,
-                        additions: additions,
-                        deletions: pendingChanges.deleted
+                        modified: modifications,
+                        added: additions,
+                        deleted: pendingChanges.deleted
                     })
                 });
 
@@ -2528,47 +2498,31 @@
                             (backup.summary.deleted && backup.summary.deleted.length > 0)
                         );
 
-                        // Create info section
-                        const infoDiv = document.createElement('div');
-                        infoDiv.className = 'backup-info';
-                        infoDiv.innerHTML = `
-                            <div class="backup-time">${backup.time_only}</div>
-                            <div class="backup-meta">
-                                <strong>User:</strong> ${backup.username} |
-                                <strong>Action:</strong> ${backup.action} |
-                                <strong>Size:</strong> ${formatFileSize(backup.size)}
+                        const summaryButton = hasSummary
+                            ? `<button class="btn-small btn-edit btn-icon" onclick='showBackupSummary(${JSON.stringify(backup.summary)}, "${backup.date}")'>
+                                Summary
+                              </button>`
+                            : '';
+
+                        itemDiv.innerHTML = `
+                            <div class="backup-info">
+                                <div class="backup-time">${backup.time_only}</div>
+                                <div class="backup-meta">
+                                    <strong>User:</strong> ${backup.username} |
+                                    <strong>Action:</strong> ${backup.action} |
+                                    <strong>Size:</strong> ${formatFileSize(backup.size)}
+                                </div>
+                            </div>
+                            <div class="backup-actions">
+                                ${summaryButton}
+                                <button class="btn-small btn-success btn-icon" onclick="restoreBackup('${backup.filename}', '${backup.date}', '${backup.username}', '${backup.action}')">
+                                    Restore
+                                </button>
+                                <button class="btn-small btn-danger btn-icon" onclick="deleteBackup('${backup.filename}', '${backup.date}')">
+                                    Delete
+                                </button>
                             </div>
                         `;
-
-                        // Create actions section
-                        const actionsDiv = document.createElement('div');
-                        actionsDiv.className = 'backup-actions';
-
-                        // Summary button
-                        if (hasSummary) {
-                            const summaryBtn = document.createElement('button');
-                            summaryBtn.className = 'btn-small btn-edit btn-icon';
-                            summaryBtn.textContent = 'Summary';
-                            summaryBtn.onclick = () => showBackupSummary(backup.summary, backup.date);
-                            actionsDiv.appendChild(summaryBtn);
-                        }
-
-                        // Restore button
-                        const restoreBtn = document.createElement('button');
-                        restoreBtn.className = 'btn-small btn-success btn-icon';
-                        restoreBtn.textContent = 'Restore';
-                        restoreBtn.onclick = () => restoreBackup(backup.filename, backup.date, backup.username, backup.action);
-                        actionsDiv.appendChild(restoreBtn);
-
-                        // Delete button
-                        const deleteBtn = document.createElement('button');
-                        deleteBtn.className = 'btn-small btn-danger btn-icon';
-                        deleteBtn.textContent = 'Delete';
-                        deleteBtn.onclick = () => deleteBackup(backup.filename, backup.date);
-                        actionsDiv.appendChild(deleteBtn);
-
-                        itemDiv.appendChild(infoDiv);
-                        itemDiv.appendChild(actionsDiv);
                         bodyDiv.appendChild(itemDiv);
                     });
 
@@ -2760,60 +2714,31 @@
             }
         }
 
-        // Close modal when clicking outside of it
-        window.onclick = function(event) {
-            const backupModal = document.getElementById('backupModal');
-            const commitModal = document.getElementById('commitModal');
-            const summaryModal = document.getElementById('summaryModal');
-            const advancedSortModal = document.getElementById('advancedSortModal');
-            const addItemModal = document.getElementById('addItemModal');
+        // Warranty Assignment Functions
+        let warrantyAssignSerials = [];
 
-            if (backupModal && event.target === backupModal) {
-                closeBackupModal();
-            }
-            if (commitModal && event.target === commitModal) {
-                closeCommitModal();
-            }
-            if (summaryModal && event.target === summaryModal) {
-                closeSummaryModal();
-            }
-            if (advancedSortModal && event.target === advancedSortModal) {
-                closeAdvancedSort();
-            }
-            if (addItemModal && event.target === addItemModal) {
-                closeAddItemModal();
-            }
-            const bulkDeleteModal = document.getElementById('bulkDeleteModal');
-            if (bulkDeleteModal && event.target === bulkDeleteModal) {
-                closeBulkDelete();
-            }
-            const deleteRowModal = document.getElementById('deleteRowModal');
-            if (deleteRowModal && event.target === deleteRowModal) {
-                closeDeleteRowModal();
-            }
-        }
-
-        // Bulk Delete Functions
-        let bulkDeleteSerials = [];
-
-        function showBulkDelete() {
-            const modal = document.getElementById('bulkDeleteModal');
-            document.getElementById('bulkDeleteInput').value = '';
-            document.getElementById('bulkDeletePreview').style.display = 'none';
-            document.getElementById('confirmBulkDeleteBtn').style.display = 'none';
-            bulkDeleteSerials = [];
+        function showAssignWarranty() {
+            const modal = document.getElementById('assignWarrantyModal');
+            document.getElementById('warrantySerialInput').value = '';
+            document.getElementById('buyTradeId').value = '';
+            document.getElementById('buyClient').value = '';
+            document.getElementById('buyStart').value = '';
+            document.getElementById('buyEnd').value = '';
+            document.getElementById('sellTradeId').value = '';
+            document.getElementById('sellClient').value = '';
+            document.getElementById('sellStart').value = '';
+            document.getElementById('sellEnd').value = '';
+            document.getElementById('warrantyAssignPreview').style.display = 'none';
+            document.getElementById('confirmAssignWarrantyBtn').style.display = 'none';
+            warrantyAssignSerials = [];
             modal.style.display = 'flex';
         }
 
-        function closeBulkDelete() {
-            const modal = document.getElementById('bulkDeleteModal');
+        function closeAssignWarranty() {
+            const modal = document.getElementById('assignWarrantyModal');
             modal.style.display = 'none';
-            // Clear password field and hide password section
-            document.getElementById('bulkDeletePassword').value = '';
-            document.getElementById('bulkDeletePasswordSection').style.display = 'none';
-            // Clear preview
-            document.getElementById('bulkDeletePreview').style.display = 'none';
-            document.getElementById('confirmBulkDeleteBtn').style.display = 'none';
+            document.getElementById('warrantyAssignPreview').style.display = 'none';
+            document.getElementById('confirmAssignWarrantyBtn').style.display = 'none';
         }
 
         function parseSerialInput(input) {
@@ -2858,121 +2783,155 @@
             return serials;
         }
 
-        function previewBulkDelete() {
-            const input = document.getElementById('bulkDeleteInput').value.trim();
+        function previewWarrantyAssignment() {
+            const input = document.getElementById('warrantySerialInput').value.trim();
 
             if (!input) {
                 showAlert('Please enter serial numbers or ranges', 'warning');
                 return;
             }
 
+            // Validate that at least one warranty field is filled
+            const buyTradeId = document.getElementById('buyTradeId').value.trim();
+            const buyClient = document.getElementById('buyClient').value.trim();
+            const buyStart = document.getElementById('buyStart').value;
+            const buyEnd = document.getElementById('buyEnd').value;
+            const sellTradeId = document.getElementById('sellTradeId').value.trim();
+            const sellClient = document.getElementById('sellClient').value.trim();
+            const sellStart = document.getElementById('sellStart').value;
+            const sellEnd = document.getElementById('sellEnd').value;
+
+            if (!buyTradeId && !buyClient && !buyStart && !buyEnd && !sellTradeId && !sellClient && !sellStart && !sellEnd) {
+                showAlert('Please fill in at least one warranty field', 'warning');
+                return;
+            }
+
             // Parse the input
             const requestedSerials = parseSerialInput(input);
 
-            // Find which serials actually exist in the database
-            const existingSerials = inventoryData
-                .map(item => item.Serial)
-                .filter(s => s);
+            // Find matching items in the current data
+            const serialColumn = headers[serialColumnIndex];
+            const matchingItems = [];
 
-            const serialsToDelete = requestedSerials.filter(s => existingSerials.includes(s));
-            const notFound = requestedSerials.filter(s => !existingSerials.includes(s));
-
-            // Store for later
-            bulkDeleteSerials = serialsToDelete;
-
-            // Show preview
-            const previewDiv = document.getElementById('bulkDeletePreview');
-            const countP = document.getElementById('bulkDeleteCount');
-            const listDiv = document.getElementById('bulkDeleteList');
-
-            if (serialsToDelete.length === 0) {
-                countP.textContent = 'No matching serials found in database';
-                countP.style.color = '#856404';
-                listDiv.innerHTML = notFound.length > 0
-                    ? '<div style="color: #856404;">Not found: ' + notFound.join(', ') + '</div>'
-                    : '';
-                document.getElementById('confirmBulkDeleteBtn').style.display = 'none';
-            } else {
-                countP.textContent = `${serialsToDelete.length} item(s) will be deleted`;
-                countP.style.color = '#dc3545';
-
-                let html = '<div style="color: #28a745; margin-bottom: 10px;">Found (' + serialsToDelete.length + '):</div>';
-                html += '<div style="color: #333;">' + serialsToDelete.join(', ') + '</div>';
-
-                if (notFound.length > 0) {
-                    html += '<div style="color: #856404; margin-top: 10px;">Not found (' + notFound.length + '):</div>';
-                    html += '<div style="color: #856404;">' + notFound.join(', ') + '</div>';
+            inventoryData.forEach((item, index) => {
+                const itemSerial = (item[serialColumn] || '').toString().trim();
+                if (requestedSerials.includes(itemSerial)) {
+                    matchingItems.push({
+                        serial: itemSerial,
+                        index: index
+                    });
                 }
+            });
 
-                listDiv.innerHTML = html;
-                document.getElementById('confirmBulkDeleteBtn').style.display = 'inline-block';
-                document.getElementById('bulkDeletePasswordSection').style.display = 'block';
+            warrantyAssignSerials = matchingItems;
+
+            // Display preview
+            const previewDiv = document.getElementById('warrantyAssignPreview');
+            const countP = document.getElementById('warrantyAssignCount');
+            const listDiv = document.getElementById('warrantyAssignList');
+
+            if (matchingItems.length === 0) {
+                countP.textContent = `No matching items found (${requestedSerials.length} serial(s) requested)`;
+                countP.style.color = '#dc3545';
+                listDiv.innerHTML = '<p style="color: #666;">No items match the specified serials in the current data.</p>';
+            } else {
+                countP.textContent = `Found ${matchingItems.length} matching item(s) (${requestedSerials.length} serial(s) requested)`;
+                countP.style.color = '#28a745';
+
+                // Show list of matching serials
+                let listHTML = '<strong>Matching Serials:</strong><br>';
+                listHTML += matchingItems.map(item => item.serial).join(', ');
+
+                // Show what will be updated
+                listHTML += '<br><br><strong>Warranty fields to be updated:</strong><br>';
+                if (buyTradeId) listHTML += `• Buy_TradeID: ${buyTradeId}<br>`;
+                if (buyClient) listHTML += `• Buy_Client: ${buyClient}<br>`;
+                if (buyStart) listHTML += `• Buy_Start: ${buyStart}<br>`;
+                if (buyEnd) listHTML += `• Buy_End: ${buyEnd}<br>`;
+                if (sellTradeId) listHTML += `• Sell_TradeID: ${sellTradeId}<br>`;
+                if (sellClient) listHTML += `• Sell_Client: ${sellClient}<br>`;
+                if (sellStart) listHTML += `• Sell_Start: ${sellStart}<br>`;
+                if (sellEnd) listHTML += `• Sell_End: ${sellEnd}<br>`;
+
+                listDiv.innerHTML = listHTML;
+                document.getElementById('confirmAssignWarrantyBtn').style.display = 'inline-block';
             }
 
             previewDiv.style.display = 'block';
         }
 
-        async function confirmBulkDelete() {
-            if (bulkDeleteSerials.length === 0) {
-                showAlert('No items to delete', 'warning');
+        function confirmWarrantyAssignment() {
+            if (warrantyAssignSerials.length === 0) {
+                showAlert('No items to update', 'warning');
                 return;
             }
 
-            // Get password from input
-            const password = document.getElementById('bulkDeletePassword').value;
-            if (!password) {
-                showAlert('Please enter your password to confirm deletion', 'warning');
-                return;
-            }
+            const buyTradeId = document.getElementById('buyTradeId').value.trim();
+            const buyClient = document.getElementById('buyClient').value.trim();
+            const buyStart = document.getElementById('buyStart').value;
+            const buyEnd = document.getElementById('buyEnd').value;
+            const sellTradeId = document.getElementById('sellTradeId').value.trim();
+            const sellClient = document.getElementById('sellClient').value.trim();
+            const sellStart = document.getElementById('sellStart').value;
+            const sellEnd = document.getElementById('sellEnd').value;
 
-            // Validate password first
-            try {
-                const passwordResponse = await fetch('/api/auth/validate-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: password })
-                });
+            // Apply warranty information to matching items
+            warrantyAssignSerials.forEach(item => {
+                const rowIndex = item.index;
 
-                const passwordResult = await passwordResponse.json();
-
-                if (!passwordResult.valid) {
-                    showAlert('Incorrect password. Please try again.', 'error');
-                    return;
+                // Check if this row already has pending changes
+                if (!pendingChanges.modified[rowIndex]) {
+                    pendingChanges.modified[rowIndex] = {};
                 }
-            } catch (error) {
-                console.error('Password validation error:', error);
-                showAlert('Failed to validate password', 'error');
-                return;
+
+                // Update warranty fields
+                if (buyTradeId) pendingChanges.modified[rowIndex]['Buy_TradeID'] = buyTradeId;
+                if (buyClient) pendingChanges.modified[rowIndex]['Buy_Client'] = buyClient;
+                if (buyStart) pendingChanges.modified[rowIndex]['Buy_Start'] = buyStart;
+                if (buyEnd) pendingChanges.modified[rowIndex]['Buy_End'] = buyEnd;
+                if (sellTradeId) pendingChanges.modified[rowIndex]['Sell_TradeID'] = sellTradeId;
+                if (sellClient) pendingChanges.modified[rowIndex]['Sell_Client'] = sellClient;
+                if (sellStart) pendingChanges.modified[rowIndex]['Sell_Start'] = sellStart;
+                if (sellEnd) pendingChanges.modified[rowIndex]['Sell_End'] = sellEnd;
+            });
+
+            updateChangesIndicator();
+            renderTable();
+            closeAssignWarranty();
+            showAlert(`Warranty information assigned to ${warrantyAssignSerials.length} item(s). Click "Save Changes" to commit.`, 'success');
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const backupModal = document.getElementById('backupModal');
+            const commitModal = document.getElementById('commitModal');
+            const summaryModal = document.getElementById('summaryModal');
+            const advancedSortModal = document.getElementById('advancedSortModal');
+            const addItemModal = document.getElementById('addItemModal');
+            const assignWarrantyModal = document.getElementById('assignWarrantyModal');
+
+            if (backupModal && event.target === backupModal) {
+                closeBackupModal();
             }
-
-            // Show confirmation dialog
-            showConfirm(
-                `Are you sure you want to delete ${bulkDeleteSerials.length} item(s)? This will also delete corresponding warranty records. This action cannot be undone.`,
-                async () => {
-                    try {
-                        const response = await fetch('/api/inventory/bulk-delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                serials: bulkDeleteSerials
-                            })
-                        });
-
-                        const result = await response.json();
-
-                        if (result.error) {
-                            showAlert('Error: ' + result.error, 'error');
-                        } else {
-                            showAlert(`Successfully deleted ${result.deleted_count} item(s)`, 'success');
-                            closeBulkDelete();
-                            await loadInventory();
-                        }
-                    } catch (error) {
-                        console.error('Bulk delete error:', error);
-                        showAlert('Failed to delete items', 'error');
-                    }
-                }
-            );
+            if (commitModal && event.target === commitModal) {
+                closeCommitModal();
+            }
+            if (summaryModal && event.target === summaryModal) {
+                closeSummaryModal();
+            }
+            if (advancedSortModal && event.target === advancedSortModal) {
+                closeAdvancedSort();
+            }
+            if (addItemModal && event.target === addItemModal) {
+                closeAddItemModal();
+            }
+            if (assignWarrantyModal && event.target === assignWarrantyModal) {
+                closeAssignWarranty();
+            }
+            const deleteRowModal = document.getElementById('deleteRowModal');
+            if (deleteRowModal && event.target === deleteRowModal) {
+                closeDeleteRowModal();
+            }
         }
     </script>
     <script>

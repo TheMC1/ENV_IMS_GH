@@ -825,121 +825,44 @@ tbody td {
     font-weight: 400;
 }
 
-/* Warranty Alerts Styles */
-.alerts-container {
+/* Quick Actions Styles */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    width: 100%;
+}
+
+.action-btn {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.alerts-loading {
-    text-align: center;
-    color: #999;
-    font-size: 12px;
-    padding: 10px;
-}
-
-.alert-item {
-    display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.alert-item:hover {
-    transform: translateX(3px);
-}
-
-.alert-item.upcoming {
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    border-left: 3px solid #28a745;
-}
-
-.alert-item.expiring {
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
-    border-left: 3px solid #ffc107;
-}
-
-.alert-item.expired {
-    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-    border-left: 3px solid #dc3545;
-}
-
-.alert-icon {
-    font-size: 16px;
-    flex-shrink: 0;
-}
-
-.alert-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.alert-title {
-    font-weight: 600;
+    justify-content: center;
+    padding: 20px 15px;
+    background: white;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    text-decoration: none;
     color: #333;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    transition: all 0.3s;
 }
 
-.alert-details {
-    color: #666;
-    font-size: 11px;
-    margin-top: 2px;
+.action-btn:hover {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
 }
 
-.alert-date {
-    font-size: 11px;
-    color: #666;
-    white-space: nowrap;
-    flex-shrink: 0;
+.action-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
 }
 
-.alerts-empty {
+.action-btn span:last-child {
+    font-size: 13px;
+    font-weight: 500;
     text-align: center;
-    color: #999;
-    font-size: 12px;
-    padding: 15px;
-    background: #f8f9fa;
-    border-radius: 8px;
-}
-
-.alerts-summary {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.alert-badge {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-.alert-badge.upcoming {
-    background: #d4edda;
-    color: #155724;
-}
-
-.alert-badge.expiring {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.alert-badge.expired {
-    background: #f8d7da;
-    color: #721c24;
 }
 
 /* Gantt Chart Styles */
@@ -1227,34 +1150,6 @@ tbody td {
     background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
 }
 
-/* Multi-level donut chart legend */
-.multi-level-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 10px 0;
-    justify-content: center;
-    margin-bottom: 10px;
-}
-
-.multi-level-legend .legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #333;
-    background: #f8f9fa;
-    padding: 4px 10px;
-    border-radius: 4px;
-}
-
-.multi-level-legend .legend-color {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    flex-shrink: 0;
-}
-
 .legend-color.buy-indicator {
     background: linear-gradient(135deg, #1565c0 0%, #42a5f5 100%);
     border-bottom: 2px solid rgba(0, 0, 0, 0.3);
@@ -1502,22 +1397,6 @@ tbody td {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.drag-handle {
-    cursor: grab;
-    color: #999;
-    font-size: 12px;
-    padding: 0 2px;
-    user-select: none;
-}
-
-.drag-handle:hover {
-    color: #667eea;
-}
-
-.groupby-order-item:active .drag-handle {
-    cursor: grabbing;
 }
 
 .groupby-order-controls {
@@ -1868,5 +1747,9 @@ tbody td {
 
     .chart-controls select {
         flex: 1;
+    }
+
+    .quick-actions {
+        grid-template-columns: 1fr;
     }
 }

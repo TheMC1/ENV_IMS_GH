@@ -34,50 +34,15 @@
                     <div class="quartile-header">
                         <h3>Inventory by Category</h3>
                         <div class="chart-controls">
-                            <label>Group by:</label>
-                            <div class="multi-select-wrapper" id="pieGroupByWrapper">
-                                <div class="multi-select-display" onclick="toggleFilterDropdown('pieGroupByDropdown')">
-                                    <span id="pieGroupByText">Registry</span>
-                                    <span class="multi-select-arrow">&#9662;</span>
-                                </div>
-                                <div class="multi-select-dropdown" id="pieGroupByDropdown">
-                                    <div class="groupby-order-list" id="pieGroupByOrderList">
-                                    </div>
-                                    <div class="multi-select-actions">
-                                        <button type="button" onclick="clearAllPieGroupBy()">Clear All</button>
-                                    </div>
-                                    <div class="multi-select-options" id="pieGroupByOptions">
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_Registry" value="Registry" checked onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_Registry">Registry</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_Market" value="Market" onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_Market">Market</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_Product" value="Product" onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_Product">Product</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_ProjectType" value="ProjectType" onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_ProjectType">Project Type</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_Protocol" value="Protocol" onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_Protocol">Protocol</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_Vintage" value="Vintage" onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_Vintage">Vintage</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="pie_groupby_IsCustody" value="IsCustody" onchange="onPieGroupByChange(event)">
-                                            <label for="pie_groupby_IsCustody">Custody Status</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <label for="groupBySelect">Group by:</label>
+                            <select id="groupBySelect" onchange="updateChart(); saveDashboardSettings();">
+                                <option value="Registry" selected>Registry</option>
+                                <option value="Market">Market</option>
+                                <option value="Product">Product</option>
+                                <option value="ProjectType">Project Type</option>
+                                <option value="Protocol">Protocol</option>
+                                <option value="IsCustody">Custody Status</option>
+                            </select>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -93,50 +58,15 @@
                     <div class="quartile-header">
                         <h3>Inventory Summary</h3>
                         <div class="chart-controls">
-                            <label>Group by:</label>
-                            <div class="multi-select-wrapper" id="summaryGroupByWrapper">
-                                <div class="multi-select-display" onclick="toggleFilterDropdown('summaryGroupByDropdown')">
-                                    <span id="summaryGroupByText">Registry</span>
-                                    <span class="multi-select-arrow">&#9662;</span>
-                                </div>
-                                <div class="multi-select-dropdown" id="summaryGroupByDropdown">
-                                    <div class="groupby-order-list" id="summaryGroupByOrderList">
-                                    </div>
-                                    <div class="multi-select-actions">
-                                        <button type="button" onclick="clearAllSummaryGroupBy()">Clear All</button>
-                                    </div>
-                                    <div class="multi-select-options" id="summaryGroupByOptions">
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_Registry" value="Registry" checked onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_Registry">Registry</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_Market" value="Market" onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_Market">Market</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_Product" value="Product" onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_Product">Product</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_ProjectType" value="ProjectType" onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_ProjectType">Project Type</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_Protocol" value="Protocol" onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_Protocol">Protocol</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_Vintage" value="Vintage" onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_Vintage">Vintage</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="summary_groupby_IsCustody" value="IsCustody" onchange="onSummaryGroupByChange(event)">
-                                            <label for="summary_groupby_IsCustody">Custody Status</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <label for="summaryGroupBy">Group by:</label>
+                            <select id="summaryGroupBy" onchange="updateSummaryView()">
+                                <option value="Registry" selected>Registry</option>
+                                <option value="Market">Market</option>
+                                <option value="Product">Product</option>
+                                <option value="ProjectType">Project Type</option>
+                                <option value="Protocol">Protocol</option>
+                                <option value="IsCustody">Custody Status</option>
+                            </select>
                         </div>
                     </div>
                     <div class="quartile-content placeholder-content">
@@ -146,14 +76,31 @@
                     </div>
                 </div>
 
-                <!-- Cell 3: Warranty Alerts -->
+                <!-- Cell 3: Quick Actions -->
                 <div class="quartile" id="quartile-3">
                     <div class="quartile-header">
-                        <h3>Warranty Alerts</h3>
+                        <h3>Quick Actions</h3>
                     </div>
                     <div class="quartile-content">
-                        <div class="alerts-container" id="warrantyAlertsContainer">
-                            <div class="alerts-loading">Loading alerts...</div>
+                        <div class="quick-actions">
+                            <a href="{{ url_for('inventory') }}" class="action-btn">
+                                <span class="action-icon">&#128230;</span>
+                                <span>Manage Inventory</span>
+                            </a>
+                            <a href="{{ url_for('warranties') }}" class="action-btn">
+                                <span class="action-icon">&#128196;</span>
+                                <span>View Warranties</span>
+                            </a>
+                            {% if user_role == 'admin' %}
+                            <a href="{{ url_for('manage_users') }}" class="action-btn">
+                                <span class="action-icon">&#128101;</span>
+                                <span>User Management</span>
+                            </a>
+                            {% endif %}
+                            <a href="{{ url_for('settings') }}" class="action-btn">
+                                <span class="action-icon">&#9881;</span>
+                                <span>Settings</span>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -200,10 +147,6 @@
                                         <div class="multi-select-option">
                                             <input type="checkbox" id="groupby_Protocol" value="Protocol" onchange="onGroupByCheckboxChange(event)">
                                             <label for="groupby_Protocol">Protocol</label>
-                                        </div>
-                                        <div class="multi-select-option">
-                                            <input type="checkbox" id="groupby_Vintage" value="Vintage" onchange="onGroupByCheckboxChange(event)">
-                                            <label for="groupby_Vintage">Vintage</label>
                                         </div>
                                         <div class="multi-select-option">
                                             <input type="checkbox" id="groupby_Buy_Client" value="Buy_Client" onchange="onGroupByCheckboxChange(event)">
@@ -314,7 +257,6 @@
                             <th>Project Name</th>
                             <th>Project Type</th>
                             <th>Protocol</th>
-                            <th>Vintage</th>
                             <th>Buy Start</th>
                             <th>Buy End</th>
                             <th>Buy Trade ID</th>
@@ -378,10 +320,6 @@
                             <div class="multi-select-option">
                                 <input type="checkbox" id="groupby_fs_Protocol" value="Protocol" onchange="onGroupByCheckboxChangeFullscreen(event)">
                                 <label for="groupby_fs_Protocol">Protocol</label>
-                            </div>
-                            <div class="multi-select-option">
-                                <input type="checkbox" id="groupby_fs_Vintage" value="Vintage" onchange="onGroupByCheckboxChangeFullscreen(event)">
-                                <label for="groupby_fs_Vintage">Vintage</label>
                             </div>
                             <div class="multi-select-option">
                                 <input type="checkbox" id="groupby_fs_Buy_Client" value="Buy_Client" onchange="onGroupByCheckboxChangeFullscreen(event)">
@@ -468,205 +406,6 @@
             '#30cfd0', '#c779d0', '#feac5e', '#a8edea', '#fed6e3'
         ];
 
-        // State for multi-select group by fields
-        let pieGroupByOrder = ['Registry'];
-        let summaryGroupByOrder = ['Registry'];
-
-        // Pie Chart Group By Functions
-        function onPieGroupByChange(event) {
-            const value = event.target.value;
-            const checked = event.target.checked;
-
-            if (checked) {
-                if (!pieGroupByOrder.includes(value)) {
-                    pieGroupByOrder.push(value);
-                }
-            } else {
-                pieGroupByOrder = pieGroupByOrder.filter(v => v !== value);
-            }
-
-            renderPieGroupByOrder();
-            updatePieGroupByText();
-            updateChart();
-            saveDashboardSettings();
-        }
-
-        function renderPieGroupByOrder() {
-            const orderList = document.getElementById('pieGroupByOrderList');
-            if (pieGroupByOrder.length === 0) {
-                orderList.innerHTML = '';
-                return;
-            }
-
-            orderList.innerHTML = pieGroupByOrder.map((field, index) => `
-                <div class="groupby-order-item" draggable="true" data-field="${field}" data-type="pie" data-index="${index}">
-                    <span class="drag-handle">&#9776;</span>
-                    <span class="groupby-order-num">${index + 1}</span>
-                    <span class="groupby-order-name">${getFieldDisplayName(field)}</span>
-                    <button type="button" class="groupby-order-btn remove" onclick="removePieGroupBy('${field}')" title="Remove">&times;</button>
-                </div>
-            `).join('');
-
-            setupGenericDragAndDrop(orderList, 'pie');
-        }
-
-        function removePieGroupBy(field) {
-            pieGroupByOrder = pieGroupByOrder.filter(v => v !== field);
-            document.getElementById('pie_groupby_' + field).checked = false;
-            renderPieGroupByOrder();
-            updatePieGroupByText();
-            updateChart();
-            saveDashboardSettings();
-        }
-
-        function clearAllPieGroupBy() {
-            pieGroupByOrder = [];
-            document.querySelectorAll('#pieGroupByOptions input[type="checkbox"]').forEach(cb => {
-                cb.checked = false;
-            });
-            renderPieGroupByOrder();
-            updatePieGroupByText();
-            updateChart();
-            saveDashboardSettings();
-        }
-
-        function updatePieGroupByText() {
-            const textEl = document.getElementById('pieGroupByText');
-            if (pieGroupByOrder.length === 0) {
-                textEl.textContent = 'Select fields...';
-            } else if (pieGroupByOrder.length === 1) {
-                textEl.textContent = getFieldDisplayName(pieGroupByOrder[0]);
-            } else {
-                textEl.textContent = pieGroupByOrder.map(f => getFieldDisplayName(f)).join(', ');
-            }
-        }
-
-        // Summary Group By Functions
-        function onSummaryGroupByChange(event) {
-            const value = event.target.value;
-            const checked = event.target.checked;
-
-            if (checked) {
-                if (!summaryGroupByOrder.includes(value)) {
-                    summaryGroupByOrder.push(value);
-                }
-            } else {
-                summaryGroupByOrder = summaryGroupByOrder.filter(v => v !== value);
-            }
-
-            renderSummaryGroupByOrder();
-            updateSummaryGroupByText();
-            updateSummaryView();
-            saveDashboardSettings();
-        }
-
-        function renderSummaryGroupByOrder() {
-            const orderList = document.getElementById('summaryGroupByOrderList');
-            if (summaryGroupByOrder.length === 0) {
-                orderList.innerHTML = '';
-                return;
-            }
-
-            orderList.innerHTML = summaryGroupByOrder.map((field, index) => `
-                <div class="groupby-order-item" draggable="true" data-field="${field}" data-type="summary" data-index="${index}">
-                    <span class="drag-handle">&#9776;</span>
-                    <span class="groupby-order-num">${index + 1}</span>
-                    <span class="groupby-order-name">${getFieldDisplayName(field)}</span>
-                    <button type="button" class="groupby-order-btn remove" onclick="removeSummaryGroupBy('${field}')" title="Remove">&times;</button>
-                </div>
-            `).join('');
-
-            setupGenericDragAndDrop(orderList, 'summary');
-        }
-
-        function removeSummaryGroupBy(field) {
-            summaryGroupByOrder = summaryGroupByOrder.filter(v => v !== field);
-            document.getElementById('summary_groupby_' + field).checked = false;
-            renderSummaryGroupByOrder();
-            updateSummaryGroupByText();
-            updateSummaryView();
-            saveDashboardSettings();
-        }
-
-        function clearAllSummaryGroupBy() {
-            summaryGroupByOrder = [];
-            document.querySelectorAll('#summaryGroupByOptions input[type="checkbox"]').forEach(cb => {
-                cb.checked = false;
-            });
-            renderSummaryGroupByOrder();
-            updateSummaryGroupByText();
-            updateSummaryView();
-            saveDashboardSettings();
-        }
-
-        function updateSummaryGroupByText() {
-            const textEl = document.getElementById('summaryGroupByText');
-            if (summaryGroupByOrder.length === 0) {
-                textEl.textContent = 'Select fields...';
-            } else if (summaryGroupByOrder.length === 1) {
-                textEl.textContent = getFieldDisplayName(summaryGroupByOrder[0]);
-            } else {
-                textEl.textContent = summaryGroupByOrder.map(f => getFieldDisplayName(f)).join(', ');
-            }
-        }
-
-        // Generic drag and drop for pie and summary group-by lists
-        function setupGenericDragAndDrop(listEl, type) {
-            const items = listEl.querySelectorAll('.groupby-order-item');
-            let draggedItem = null;
-            let draggedIndex = null;
-
-            items.forEach(item => {
-                item.addEventListener('dragstart', (e) => {
-                    draggedItem = item;
-                    draggedIndex = parseInt(item.dataset.index);
-                    item.classList.add('dragging');
-                    e.dataTransfer.effectAllowed = 'move';
-                });
-
-                item.addEventListener('dragend', () => {
-                    item.classList.remove('dragging');
-                    draggedItem = null;
-                    draggedIndex = null;
-                });
-
-                item.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    if (item !== draggedItem) {
-                        item.classList.add('drag-over');
-                    }
-                });
-
-                item.addEventListener('dragleave', () => {
-                    item.classList.remove('drag-over');
-                });
-
-                item.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    item.classList.remove('drag-over');
-
-                    const dropIndex = parseInt(item.dataset.index);
-                    if (draggedIndex !== null && draggedIndex !== dropIndex) {
-                        if (type === 'pie') {
-                            const [movedField] = pieGroupByOrder.splice(draggedIndex, 1);
-                            pieGroupByOrder.splice(dropIndex, 0, movedField);
-                            renderPieGroupByOrder();
-                            updatePieGroupByText();
-                            updateChart();
-                        } else if (type === 'summary') {
-                            const [movedField] = summaryGroupByOrder.splice(draggedIndex, 1);
-                            summaryGroupByOrder.splice(dropIndex, 0, movedField);
-                            renderSummaryGroupByOrder();
-                            updateSummaryGroupByText();
-                            updateSummaryView();
-                        }
-                        saveDashboardSettings();
-                    }
-                });
-            });
-        }
-
         async function fetchChartData(groupBy = 'Registry') {
             try {
                 const response = await fetch(`/api/dashboard/stats?group_by=${groupBy}`);
@@ -678,216 +417,69 @@
             }
         }
 
-        function createPieChart(data) {
+        function createPieChart(labels, values) {
             const ctx = document.getElementById('pieChart').getContext('2d');
 
             if (pieChart) {
                 pieChart.destroy();
             }
 
-            // Check if we have hierarchical data for multi-level donut
-            if (data.hierarchical && data.levels && data.levels.length > 1) {
-                createMultiLevelDonut(ctx, data);
-            } else {
-                // Restore default chartStats for single-level chart
-                const chartStats = document.getElementById('chartStats');
-                if (chartStats) {
-                    chartStats.innerHTML = `<span class="stat-total">Total: <strong id="totalCount">${data.total || 0}</strong> items</span>`;
-                }
-                // Single level pie chart
-                pieChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: data.labels,
-                        datasets: [{
-                            data: data.values,
-                            backgroundColor: chartColors.slice(0, data.labels.length),
-                            borderColor: '#fff',
-                            borderWidth: 2,
-                            hoverOffset: 10
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '40%',
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: {
-                                    padding: 15,
-                                    usePointStyle: true,
-                                    pointStyle: 'circle',
-                                    font: {
-                                        size: 11,
-                                        family: 'Roboto'
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
-                                        return `${context.label}: ${context.parsed} (${percentage}%)`;
-                                    }
-                                }
-                            }
-                        },
-                        onClick: (event, elements) => {
-                            if (elements.length > 0) {
-                                const index = elements[0].index;
-                                const label = pieChart.data.labels[index];
-                                const value = pieChart.data.datasets[0].data[index];
-                                showChartDetail(label, value);
-                            }
-                        }
-                    }
-                });
-            }
-        }
-
-        function createMultiLevelDonut(ctx, data) {
-            const levels = data.levels;
-            const numLevels = levels.length;
-
-            // Generate color maps for consistency across levels
-            const level0Colors = {};
-            levels[0].labels.forEach((label, idx) => {
-                level0Colors[label] = chartColors[idx % chartColors.length];
-            });
-
-            // Build datasets for each level (inner to outer)
-            const datasets = [];
-            const cutoutStart = 25;
-            const ringWidth = Math.min(30, (75 - cutoutStart) / numLevels);
-
-            for (let levelIdx = 0; levelIdx < numLevels; levelIdx++) {
-                const level = levels[levelIdx];
-                const colors = [];
-
-                // Assign colors based on parent hierarchy
-                level.labels.forEach((label, idx) => {
-                    if (levelIdx === 0) {
-                        colors.push(level0Colors[label]);
-                    } else {
-                        // Find root parent and use its color with variation
-                        let parentLabel = label;
-                        for (let i = levelIdx; i > 0; i--) {
-                            parentLabel = levels[i].parent_map[parentLabel] || parentLabel;
-                        }
-                        const baseColor = level0Colors[parentLabel] || chartColors[idx % chartColors.length];
-                        // Add slight variation for child levels
-                        colors.push(adjustColorBrightness(baseColor, levelIdx * 15));
-                    }
-                });
-
-                const cutout = cutoutStart + (levelIdx * ringWidth);
-                const radius = cutoutStart + ((levelIdx + 1) * ringWidth);
-
-                datasets.push({
-                    data: level.values,
-                    backgroundColor: colors,
-                    borderColor: '#fff',
-                    borderWidth: 1,
-                    hoverOffset: 5,
-                    // Store level info for tooltip
-                    levelField: level.field,
-                    levelLabels: level.labels
-                });
-            }
-
-            // Create chart with multiple datasets
             pieChart = new Chart(ctx, {
-                type: 'doughnut',
+                type: 'pie',
                 data: {
-                    labels: levels[numLevels - 1].labels, // Use outermost labels for legend
-                    datasets: datasets
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: chartColors.slice(0, labels.length),
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: cutoutStart + '%',
                     plugins: {
                         legend: {
-                            display: false // Hide default legend for multi-level
+                            position: 'right',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                font: {
+                                    size: 12,
+                                    family: 'Roboto'
+                                }
+                            }
                         },
                         tooltip: {
                             callbacks: {
-                                title: function(context) {
-                                    const datasetIndex = context[0].datasetIndex;
-                                    const field = datasets[datasetIndex].levelField;
-                                    return getFieldDisplayName(field);
-                                },
                                 label: function(context) {
-                                    const datasetIndex = context.datasetIndex;
-                                    const index = context.dataIndex;
-                                    const label = datasets[datasetIndex].levelLabels[index];
-                                    const value = context.parsed;
-                                    const total = data.total;
-                                    const percentage = ((value / total) * 100).toFixed(1);
-
-                                    // Show only the last part of the label for cleaner display
-                                    const displayLabel = label.includes(' | ') ? label.split(' | ').pop() : label;
-                                    return `${displayLabel}: ${value} (${percentage}%)`;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
                                 }
                             }
                         }
                     },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
-                            const datasetIndex = elements[0].datasetIndex;
                             const index = elements[0].index;
-                            const label = datasets[datasetIndex].levelLabels[index];
-                            const value = datasets[datasetIndex].data[index];
+                            const label = pieChart.data.labels[index];
+                            const value = pieChart.data.datasets[0].data[index];
                             showChartDetail(label, value);
                         }
                     }
                 }
             });
-
-            // Create custom legend for multi-level chart
-            createMultiLevelLegend(levels, level0Colors);
-        }
-
-        function adjustColorBrightness(hex, percent) {
-            // Convert hex to RGB, adjust brightness, convert back
-            let r = parseInt(hex.slice(1, 3), 16);
-            let g = parseInt(hex.slice(3, 5), 16);
-            let b = parseInt(hex.slice(5, 7), 16);
-
-            r = Math.min(255, Math.floor(r + (255 - r) * percent / 100));
-            g = Math.min(255, Math.floor(g + (255 - g) * percent / 100));
-            b = Math.min(255, Math.floor(b + (255 - b) * percent / 100));
-
-            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        }
-
-        function createMultiLevelLegend(levels, colorMap) {
-            // Create a simple legend showing the first level categories
-            const legendContainer = document.getElementById('chartStats');
-            if (!legendContainer) return;
-
-            let html = '<div class="multi-level-legend">';
-            levels[0].labels.forEach((label, idx) => {
-                const color = colorMap[label];
-                const value = levels[0].values[idx];
-                html += `<span class="legend-item" style="--color: ${color}">
-                    <span class="legend-color" style="background: ${color}"></span>
-                    ${label} (${value})
-                </span>`;
-            });
-            html += '</div>';
-            html += `<span class="stat-total">Total: <strong id="totalCount">${levels[0].values.reduce((a, b) => a + b, 0)}</strong> items</span>`;
-            legendContainer.innerHTML = html;
         }
 
         function showChartDetail(label, value) {
-            const groupByLabel = pieGroupByOrder.map(f => getFieldDisplayName(f)).join(' | ');
-            alert(`${groupByLabel}: ${label}\nCount: ${value} items`);
+            const groupBy = document.getElementById('groupBySelect').value;
+            alert(`${groupBy}: ${label}\nCount: ${value} items`);
         }
 
-        function updateSummaryStats(data, groupByFields) {
+        function updateSummaryStats(data) {
             const summaryContainer = document.getElementById('summaryStats');
             if (!data || !data.labels) {
                 summaryContainer.innerHTML = '<p class="placeholder-text">No data available</p>';
@@ -895,7 +487,7 @@
             }
 
             let html = '';
-            const groupByLabel = groupByFields ? groupByFields.map(f => getFieldDisplayName(f)).join(' | ') : 'Category';
+            const groupBy = data.group_by;
 
             // Create summary cards for top categories
             const sortedData = data.labels.map((label, i) => ({
@@ -905,7 +497,7 @@
 
             const topItems = sortedData.slice(0, 5);
 
-            html += `<div class="summary-header">Top ${groupByLabel} Categories</div>`;
+            html += `<div class="summary-header">Top ${groupBy} Categories</div>`;
             html += '<div class="summary-list">';
 
             topItems.forEach((item, index) => {
@@ -924,34 +516,22 @@
         }
 
         async function updateSummaryView() {
-            if (summaryGroupByOrder.length === 0) {
-                document.getElementById('summaryStats').innerHTML = '<p class="placeholder-text">Select at least one field to group by</p>';
-                return;
-            }
-            const groupBy = summaryGroupByOrder.join(',');
+            const groupBy = document.getElementById('summaryGroupBy').value;
             const data = await fetchChartData(groupBy);
 
             if (data && data.labels) {
-                updateSummaryStats(data, summaryGroupByOrder);
+                updateSummaryStats(data);
             }
         }
 
         async function updateChart() {
-            if (pieGroupByOrder.length === 0) {
-                if (pieChart) pieChart.destroy();
-                pieChart = null;
-                document.getElementById('totalCount').textContent = '0';
-                return;
-            }
-            const groupBy = pieGroupByOrder.join(',');
+            const groupBy = document.getElementById('groupBySelect').value;
             const data = await fetchChartData(groupBy);
 
             if (data && data.labels) {
-                createPieChart(data);
-                // Only update totalCount if not hierarchical (hierarchical updates it in legend)
-                if (!data.hierarchical) {
-                    document.getElementById('totalCount').textContent = data.total;
-                }
+                createPieChart(data.labels, data.values);
+                document.getElementById('totalCount').textContent = data.total;
+                updateSummaryStats(data);
             }
         }
 
@@ -984,11 +564,11 @@
         function collectCurrentSettings() {
             const settings = {};
 
-            // Pie chart group by - save the ordered array
-            settings.pieGroupBy = [...pieGroupByOrder];
-
-            // Summary group by - save the ordered array
-            settings.summaryGroupBy = [...summaryGroupByOrder];
+            // Inventory Summary group by
+            const inventoryGroupBy = document.getElementById('groupBySelect');
+            if (inventoryGroupBy) {
+                settings.inventoryGroupBy = inventoryGroupBy.value;
+            }
 
             // Gantt chart group by - save the ordered array
             settings.ganttGroupBy = [...groupByOrder];
@@ -1010,35 +590,17 @@
 
         function applySettings(settings) {
             if (!settings || Object.keys(settings).length === 0) {
-                // No settings - render initial order lists
-                renderPieGroupByOrder();
-                renderSummaryGroupByOrder();
+                // No settings - render initial order list
                 renderGroupByOrderList(false);
                 return;
             }
 
-            // Apply pie chart group by - restore the ordered array
-            if (settings.pieGroupBy && Array.isArray(settings.pieGroupBy) && settings.pieGroupBy.length > 0) {
-                pieGroupByOrder = [...settings.pieGroupBy];
-                document.querySelectorAll('#pieGroupByOptions input[type="checkbox"]').forEach(cb => {
-                    cb.checked = pieGroupByOrder.includes(cb.value);
-                });
-                renderPieGroupByOrder();
-                updatePieGroupByText();
-            } else {
-                renderPieGroupByOrder();
-            }
-
-            // Apply summary group by - restore the ordered array
-            if (settings.summaryGroupBy && Array.isArray(settings.summaryGroupBy) && settings.summaryGroupBy.length > 0) {
-                summaryGroupByOrder = [...settings.summaryGroupBy];
-                document.querySelectorAll('#summaryGroupByOptions input[type="checkbox"]').forEach(cb => {
-                    cb.checked = summaryGroupByOrder.includes(cb.value);
-                });
-                renderSummaryGroupByOrder();
-                updateSummaryGroupByText();
-            } else {
-                renderSummaryGroupByOrder();
+            // Apply inventory group by
+            if (settings.inventoryGroupBy) {
+                const inventoryGroupBy = document.getElementById('groupBySelect');
+                if (inventoryGroupBy) {
+                    inventoryGroupBy.value = settings.inventoryGroupBy;
+                }
             }
 
             // Apply gantt group by - restore the ordered array
@@ -1105,132 +667,13 @@
 
             // Then load charts
             updateChart();
-            updateSummaryView();
             await updateGanttChart();
 
             // Apply filters after chart data is loaded
             if (loadedSettings.ganttFilters) {
                 applyFiltersAfterLoad(loadedSettings);
             }
-
-            // Load warranty alerts
-            await loadWarrantyAlerts();
         });
-
-        // Warranty Alerts Functions
-        async function loadWarrantyAlerts() {
-            const container = document.getElementById('warrantyAlertsContainer');
-            try {
-                const response = await fetch('/api/dashboard/warranty-alerts');
-                if (!response.ok) throw new Error('Failed to fetch alerts');
-                const data = await response.json();
-
-                renderWarrantyAlerts(data);
-            } catch (error) {
-                console.error('Error loading warranty alerts:', error);
-                container.innerHTML = '<div class="alerts-empty">Failed to load alerts</div>';
-            }
-        }
-
-        function renderWarrantyAlerts(data) {
-            const container = document.getElementById('warrantyAlertsContainer');
-            const { alerts, counts } = data;
-
-            const totalAlerts = (alerts.upcoming?.length || 0) +
-                               (alerts.buy_expiring?.length || 0) +
-                               (alerts.sell_expiring?.length || 0) +
-                               (alerts.expired?.length || 0);
-
-            if (totalAlerts === 0) {
-                container.innerHTML = '<div class="alerts-empty">No warranty alerts at this time</div>';
-                return;
-            }
-
-            let html = '';
-
-            // Summary badges
-            html += '<div class="alerts-summary">';
-            if (counts.upcoming > 0) {
-                html += `<span class="alert-badge upcoming">&#128198; ${counts.upcoming} upcoming</span>`;
-            }
-            if (counts.buy_expiring > 0) {
-                html += `<span class="alert-badge expiring">&#9888; ${counts.buy_expiring} buy expiring</span>`;
-            }
-            if (counts.sell_expiring > 0) {
-                html += `<span class="alert-badge expiring">&#9888; ${counts.sell_expiring} sell expiring</span>`;
-            }
-            if (counts.expired > 0) {
-                html += `<span class="alert-badge expired">&#10060; ${counts.expired} expired</span>`;
-            }
-            html += '</div>';
-
-            // Alert items - Show expired first, then expiring (buy then sell), then upcoming
-            alerts.expired?.forEach(alert => {
-                html += renderAlertItem(alert, 'expired');
-            });
-
-            alerts.buy_expiring?.forEach(alert => {
-                html += renderAlertItem(alert, 'buy_expiring');
-            });
-
-            alerts.sell_expiring?.forEach(alert => {
-                html += renderAlertItem(alert, 'sell_expiring');
-            });
-
-            alerts.upcoming?.forEach(alert => {
-                html += renderAlertItem(alert, 'upcoming');
-            });
-
-            container.innerHTML = html;
-        }
-
-        function renderAlertItem(alert, type) {
-            let icon, cssClass, periodLabel;
-
-            if (type === 'upcoming') {
-                icon = '&#128198;';
-                cssClass = 'upcoming';
-                periodLabel = '';
-            } else if (type === 'buy_expiring') {
-                icon = '&#9888;';
-                cssClass = 'expiring';
-                periodLabel = 'Buy ';
-            } else if (type === 'sell_expiring') {
-                icon = '&#9888;';
-                cssClass = 'expiring';
-                periodLabel = 'Sell ';
-            } else {
-                icon = '&#10060;';
-                cssClass = 'expired';
-                periodLabel = alert.period ? `${alert.period} ` : '';
-            }
-
-            const title = alert.project_name || alert.project_id || 'Unknown Project';
-            const displayTitle = title.length > 25 ? title.substring(0, 25) + '...' : title;
-
-            let dateLabel = '';
-            if (type === 'upcoming') {
-                dateLabel = alert.days === 1 ? 'Starts tomorrow' : `Starts in ${alert.days} days`;
-            } else if (type === 'buy_expiring' || type === 'sell_expiring') {
-                dateLabel = alert.days === 0 ? `${periodLabel}expires today` :
-                           (alert.days === 1 ? `${periodLabel}expires tomorrow` :
-                           `${periodLabel}expires in ${alert.days} days`);
-            } else {
-                dateLabel = alert.days === -1 ? `${periodLabel}expired yesterday` :
-                           `${periodLabel}expired ${Math.abs(alert.days)} days ago`;
-            }
-
-            return `
-                <div class="alert-item ${cssClass}" onclick="window.location.href='{{ url_for('warranties') }}'">
-                    <span class="alert-icon">${icon}</span>
-                    <div class="alert-content">
-                        <div class="alert-title" title="${title}">${displayTitle}</div>
-                        <div class="alert-details">${alert.count} credit${alert.count !== 1 ? 's' : ''} - ${alert.project_id}</div>
-                    </div>
-                    <span class="alert-date">${dateLabel}</span>
-                </div>
-            `;
-        }
 
         // Gantt Chart Functions
         async function fetchGanttData(groupBy = 'ProjectID') {
@@ -1315,7 +758,6 @@
                 'Product': 'Product',
                 'ProjectType': 'Project Type',
                 'Protocol': 'Protocol',
-                'Vintage': 'Vintage',
                 'Buy_Client': 'Buy Client',
                 'Sell_Client': 'Sell Client',
                 'Buy_TradeID': 'Buy Trade ID',
@@ -1337,7 +779,6 @@
 
             listEl.innerHTML = order.map((field, idx) => `
                 <div class="groupby-order-item" draggable="true" data-field="${field}" data-index="${idx}">
-                    <span class="drag-handle">&#9776;</span>
                     <span class="groupby-order-num">${idx + 1}</span>
                     <span class="groupby-order-name">${getFieldDisplayName(field)}</span>
                     <div class="groupby-order-controls">
@@ -2398,9 +1839,6 @@
                     }
                     const itemGroupValue = keyParts.join(' | ');
 
-                    // Check if group label matches
-                    if (itemGroupValue !== label) return false;
-
                     let itemStart, itemEnd;
                     if (periodType === 'sell') {
                         itemStart = item.Sell_Start || '';
@@ -2410,13 +1848,9 @@
                         itemEnd = item.Buy_End || '';
                     }
 
-                    // In aggregate mode, match all items with valid dates for this period type
-                    if (aggregateBarsMode) {
-                        return itemStart !== '' && itemEnd !== '';
-                    }
-
-                    // In normal mode, match exact dates
-                    return itemStart === startDate && itemEnd === endDate;
+                    return itemGroupValue === label &&
+                           itemStart === startDate &&
+                           itemEnd === endDate;
                 });
 
                 // Update dialog title and subtitle
@@ -2436,7 +1870,7 @@
                 // Populate table
                 const tbody = document.getElementById('creditsDialogBody');
                 if (groupedCredits.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="18" style="text-align: center; color: #999;">No credits found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="17" style="text-align: center; color: #999;">No credits found</td></tr>';
                 } else {
                     tbody.innerHTML = groupedCredits.map(group => `
                         <tr>
@@ -2449,7 +1883,6 @@
                             <td>${group.projectName}</td>
                             <td>${group.projectType}</td>
                             <td>${group.protocol}</td>
-                            <td>${group.vintage}</td>
                             <td>${group.buyStart}</td>
                             <td>${group.buyEnd}</td>
                             <td>${group.buyTradeId}</td>
@@ -2488,7 +1921,7 @@
             const groups = {};
 
             credits.forEach(credit => {
-                const key = `${credit.Market || ''}|${credit.Registry || ''}|${credit.Product || ''}|${credit.ProjectID || ''}|${credit.ProjectName || ''}|${credit.ProjectType || ''}|${credit.Protocol || ''}|${credit.Vintage || ''}|${credit.Buy_Start || ''}|${credit.Buy_End || ''}|${credit.Buy_TradeID || ''}|${credit.Buy_Client || ''}|${credit.Sell_Start || ''}|${credit.Sell_End || ''}|${credit.Sell_TradeID || ''}|${credit.Sell_Client || ''}`;
+                const key = `${credit.Market || ''}|${credit.Registry || ''}|${credit.Product || ''}|${credit.ProjectID || ''}|${credit.ProjectName || ''}|${credit.ProjectType || ''}|${credit.Protocol || ''}|${credit.Buy_Start || ''}|${credit.Buy_End || ''}|${credit.Buy_TradeID || ''}|${credit.Buy_Client || ''}|${credit.Sell_Start || ''}|${credit.Sell_End || ''}|${credit.Sell_TradeID || ''}|${credit.Sell_Client || ''}`;
 
                 if (!groups[key]) {
                     groups[key] = {
@@ -2500,7 +1933,6 @@
                         projectName: credit.ProjectName || '-',
                         projectType: credit.ProjectType || '-',
                         protocol: credit.Protocol || '-',
-                        vintage: credit.Vintage || '-',
                         buyStart: credit.Buy_Start || '-',
                         buyEnd: credit.Buy_End || '-',
                         buyTradeId: credit.Buy_TradeID || '-',
@@ -2568,7 +2000,6 @@
                     projectName: group.projectName,
                     projectType: group.projectType,
                     protocol: group.protocol,
-                    vintage: group.vintage,
                     buyStart: group.buyStart,
                     buyEnd: group.buyEnd,
                     buyTradeId: group.buyTradeId,
@@ -2625,9 +2056,6 @@
                     }
                     const itemGroupValue = keyParts.join(' | ');
 
-                    // Check if group label matches
-                    if (itemGroupValue !== label) return false;
-
                     let itemStart, itemEnd;
                     if (periodType === 'sell') {
                         itemStart = item.Sell_Start || '';
@@ -2637,13 +2065,9 @@
                         itemEnd = item.Buy_End || '';
                     }
 
-                    // In aggregate mode, match all items with valid dates for this period type
-                    if (aggregateBarsMode) {
-                        return itemStart !== '' && itemEnd !== '';
-                    }
-
-                    // In normal mode, match exact dates
-                    return itemStart === startDate && itemEnd === endDate;
+                    return itemGroupValue === label &&
+                           itemStart === startDate &&
+                           itemEnd === endDate;
                 });
 
                 // Update dialog title and subtitle
@@ -2663,7 +2087,7 @@
                 // Populate table
                 const tbody = document.getElementById('creditsDialogBody');
                 if (groupedCredits.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="18" style="text-align: center; color: #999;">No credits found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="17" style="text-align: center; color: #999;">No credits found</td></tr>';
                 } else {
                     tbody.innerHTML = groupedCredits.map(group => `
                         <tr>
@@ -2676,7 +2100,6 @@
                             <td>${group.projectName}</td>
                             <td>${group.projectType}</td>
                             <td>${group.protocol}</td>
-                            <td>${group.vintage}</td>
                             <td>${group.buyStart}</td>
                             <td>${group.buyEnd}</td>
                             <td>${group.buyTradeId}</td>

@@ -488,7 +488,6 @@
                     <div class="pagination-controls">
                         <button class="btn-primary" onclick="showAdvancedSort()" style="padding: 8px 16px; font-size: 14px; white-space: nowrap;">Advanced Sort</button>
                         <button class="btn-primary" onclick="clearFilters()" style="padding: 8px 16px; font-size: 14px; white-space: nowrap;">Clear Filters</button>
-                        <button class="btn-primary" onclick="exportToExcel()" style="padding: 8px 16px; font-size: 14px; white-space: nowrap;">Export to Excel</button>
                         <button id="prevPage" onclick="changePage(-1)" disabled>Previous</button>
                         <div id="pageNavigation" style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px;">
                             <span style="font-size: 14px;">Page</span>
@@ -1590,76 +1589,6 @@
             currentPage = 1;
             renderTable();
             saveFiltersToServer();
-        }
-
-        function exportToExcel() {
-            // Get filtered data
-            let allRows = [...inventoryData, ...pendingChanges.added];
-            allRows = allRows.map(row => {
-                const rowIndex = row._row_index;
-                if (pendingChanges.modified[rowIndex]) {
-                    return { ...row, ...pendingChanges.modified[rowIndex] };
-                }
-                return row;
-            });
-
-            // Apply summarization if in summarized view mode
-            if (viewMode === 'summarized') {
-                allRows = summarizeData(allRows);
-            }
-
-            const filteredData = applyFilters(allRows);
-
-            if (filteredData.length === 0) {
-                showAlert('No data to export', 'warning');
-                return;
-            }
-
-            // Get visible headers (exclude internal fields)
-            const exportHeaders = headers.filter(h => !h.startsWith('_'));
-
-            // For summarized view, add a Count column
-            const finalHeaders = viewMode === 'summarized'
-                ? [...exportHeaders, 'Count']
-                : exportHeaders;
-
-            // Create CSV content
-            const escapeCSV = (value) => {
-                if (value === null || value === undefined) return '';
-                const str = String(value);
-                if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-                    return '"' + str.replace(/"/g, '""') + '"';
-                }
-                return str;
-            };
-
-            let csv = finalHeaders.map(escapeCSV).join(',') + '\n';
-
-            filteredData.forEach(row => {
-                const rowData = exportHeaders.map(header => escapeCSV(row[header]));
-                // Add count for summarized view
-                if (viewMode === 'summarized') {
-                    const count = row._underlying_rows ? row._underlying_rows.length : 1;
-                    rowData.push(count);
-                }
-                csv += rowData.join(',') + '\n';
-            });
-
-            // Create and download file
-            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            const timestamp = new Date().toISOString().slice(0, 10);
-            const viewSuffix = viewMode === 'summarized' ? '_summarized' : '';
-            link.setAttribute('download', `inventory_export${viewSuffix}_${timestamp}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            showAlert(`Exported ${filteredData.length} records to Excel`, 'success');
         }
 
         function changeRowsPerPage() {

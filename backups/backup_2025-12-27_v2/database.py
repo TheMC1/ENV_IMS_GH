@@ -351,22 +351,12 @@ def init_inventory_database():
             project_type TEXT,
             protocol TEXT,
             project_name TEXT,
-            vintage TEXT,
             serial TEXT UNIQUE,
             is_custody TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
-    # Add vintage column if it doesn't exist (for existing databases)
-    cursor.execute("PRAGMA table_info(inventory)")
-    inventory_columns = [column[1] for column in cursor.fetchall()]
-    if 'vintage' not in inventory_columns:
-        try:
-            cursor.execute("ALTER TABLE inventory ADD COLUMN vintage TEXT")
-        except:
-            pass
 
     # Create backups table to store inventory snapshots
     cursor.execute('''
@@ -460,7 +450,7 @@ def get_all_inventory_items():
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, market, registry, product, project_id, project_type,
-                   protocol, project_name, vintage, serial, is_custody
+                   protocol, project_name, serial, is_custody
             FROM inventory
             ORDER BY id
         """)
@@ -478,7 +468,6 @@ def get_all_inventory_items():
                 'ProjectType': row['project_type'] or '',
                 'Protocol': row['protocol'] or '',
                 'ProjectName': row['project_name'] or '',
-                'Vintage': row['vintage'] or '',
                 'Serial': row['serial'] or '',
                 'IsCustody': row['is_custody'] or ''
             }
@@ -511,7 +500,6 @@ def get_inventory_headers():
         'ProjectType',
         'Protocol',
         'ProjectName',
-        'Vintage',
         'Serial',
         'IsCustody'
     ]
@@ -545,8 +533,8 @@ def add_inventory_item(item_data):
         # Insert into individual columns
         cursor.execute("""
             INSERT INTO inventory (market, registry, product, project_id, project_type,
-                                 protocol, project_name, vintage, serial, is_custody)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 protocol, project_name, serial, is_custody)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             clean_data.get('Market', ''),
             clean_data.get('Registry', ''),
@@ -555,7 +543,6 @@ def add_inventory_item(item_data):
             clean_data.get('ProjectType', ''),
             clean_data.get('Protocol', ''),
             clean_data.get('ProjectName', ''),
-            clean_data.get('Vintage', ''),
             clean_data.get('Serial', ''),
             clean_data.get('IsCustody', '')
         ))
@@ -606,7 +593,7 @@ def update_inventory_item(item_id, item_data):
         cursor.execute("""
             UPDATE inventory
             SET market = ?, registry = ?, product = ?, project_id = ?, project_type = ?,
-                protocol = ?, project_name = ?, vintage = ?, serial = ?, is_custody = ?,
+                protocol = ?, project_name = ?, serial = ?, is_custody = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (
@@ -617,7 +604,6 @@ def update_inventory_item(item_id, item_data):
             clean_data.get('ProjectType', ''),
             clean_data.get('Protocol', ''),
             clean_data.get('ProjectName', ''),
-            clean_data.get('Vintage', ''),
             new_serial,
             clean_data.get('IsCustody', ''),
             item_id
@@ -744,8 +730,8 @@ def restore_inventory_backup(backup_id):
             clean_data = {k: v for k, v in item.items() if k != '_row_index'}
             cursor.execute("""
                 INSERT INTO inventory (market, registry, product, project_id, project_type,
-                                     protocol, project_name, vintage, serial, is_custody)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     protocol, project_name, serial, is_custody)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 clean_data.get('Market', ''),
                 clean_data.get('Registry', ''),
@@ -754,7 +740,6 @@ def restore_inventory_backup(backup_id):
                 clean_data.get('ProjectType', ''),
                 clean_data.get('Protocol', ''),
                 clean_data.get('ProjectName', ''),
-                clean_data.get('Vintage', ''),
                 clean_data.get('Serial', ''),
                 clean_data.get('IsCustody', '')
             ))
@@ -830,7 +815,6 @@ def get_all_warranty_items():
                 i.project_type,
                 i.protocol,
                 i.project_name,
-                i.vintage,
                 i.is_custody
             FROM warranties w
             LEFT JOIN inventory i ON i.serial = w.serial
@@ -860,7 +844,6 @@ def get_all_warranty_items():
                 'ProjectType': row['project_type'] or '',
                 'Protocol': row['protocol'] or '',
                 'ProjectName': row['project_name'] or '',
-                'Vintage': row['vintage'] or '',
                 'IsCustody': row['is_custody'] or ''
             }
 
@@ -893,7 +876,6 @@ def get_warranty_headers():
         'ProjectType',
         'Protocol',
         'ProjectName',
-        'Vintage',
         'IsCustody',
         'Serial',
         'Buy_Start',
