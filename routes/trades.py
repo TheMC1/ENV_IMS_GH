@@ -38,8 +38,8 @@ def get_trades():
 
         # Add assignment status to each trade
         for trade in trades_list:
-            trade_id = trade.get('trade_id', '')
-            assigned_items = get_inventory_by_trade(trade_id)
+            deal_number = trade.get('DealNumber', '')
+            assigned_items = get_inventory_by_trade(deal_number)
             trade['_assigned_count'] = len(assigned_items)
             trade['_assigned_serials'] = [item['Serial'] for item in assigned_items]
 
@@ -51,17 +51,23 @@ def get_trades():
         return jsonify({'error': str(e)}), 500
 
 
-@trades_bp.route('/api/trades/<trade_id>', methods=['GET'])
+@trades_bp.route('/api/trades/<deal_number>', methods=['GET'])
 @login_required
-def get_trade_details(trade_id):
+def get_trade_details(deal_number):
     """Get details for a specific trade"""
     try:
-        trade = get_trade_by_id(trade_id)
+        # Try to convert to int if it's a numeric deal number
+        try:
+            deal_number = int(deal_number)
+        except (ValueError, TypeError):
+            pass
+
+        trade = get_trade_by_id(deal_number)
         if not trade:
             return jsonify({'error': 'Trade not found'}), 404
 
         # Get assigned inventory
-        assigned_items = get_inventory_by_trade(trade_id)
+        assigned_items = get_inventory_by_trade(deal_number)
 
         return jsonify({
             'trade': trade,
@@ -83,12 +89,12 @@ def get_available_inventory():
         return jsonify({'error': str(e)}), 500
 
 
-@trades_bp.route('/api/trades/assigned-inventory/<trade_id>', methods=['GET'])
+@trades_bp.route('/api/trades/assigned-inventory/<deal_number>', methods=['GET'])
 @login_required
-def get_assigned_inventory(trade_id):
+def get_assigned_inventory(deal_number):
     """Get inventory items assigned to a specific trade"""
     try:
-        items = get_inventory_by_trade(trade_id)
+        items = get_inventory_by_trade(deal_number)
         return jsonify({'data': items})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -160,7 +166,7 @@ def bulk_assign_to_trade():
     """
     try:
         data = request.json
-        trade_id = data.get('trade_id')
+        deal_number = data.get('deal_number')
         serials = data.get('serials', [])
 
         # Warranty data to apply to all assigned items
@@ -175,18 +181,18 @@ def bulk_assign_to_trade():
             'set_sell_tradeid': data.get('set_sell_tradeid', False)
         }
 
-        if not trade_id:
-            return jsonify({'error': 'Trade ID is required'}), 400
+        if not deal_number:
+            return jsonify({'error': 'Deal Number is required'}), 400
 
         if not serials:
             return jsonify({'error': 'No inventory items selected'}), 400
 
-        # Validate against trade quantity
-        trade = get_trade_by_id(trade_id)
+        # Validate against trade notional (quantity)
+        trade = get_trade_by_id(deal_number)
         if trade:
-            trade_quantity = trade.get('quantity', 0)
-            already_assigned = len(get_inventory_by_trade(trade_id))
-            remaining_quantity = trade_quantity - already_assigned
+            trade_notional = trade.get('Notional', 0)
+            already_assigned = len(get_inventory_by_trade(deal_number))
+            remaining_quantity = trade_notional - already_assigned
 
             if len(serials) > remaining_quantity:
                 return jsonify({
@@ -194,12 +200,12 @@ def bulk_assign_to_trade():
                 }), 400
 
         # Assign inventory with warranty data
-        success, message, count = assign_inventory_to_trade(serials, trade_id, warranty_data)
+        success, message, count = assign_inventory_to_trade(serials, deal_number, warranty_data)
 
         if success:
             # Get updated trade info
-            trade = get_trade_by_id(trade_id)
-            assigned_items = get_inventory_by_trade(trade_id)
+            trade = get_trade_by_id(deal_number)
+            assigned_items = get_inventory_by_trade(deal_number)
 
             return jsonify({
                 'success': True,
@@ -224,25 +230,25 @@ def create_serials():
     """
     try:
         data = request.json
-        trade_id = data.get('trade_id')
+        deal_number = data.get('deal_number')
         serials = data.get('serials', [])
 
-        if not trade_id:
-            return jsonify({'error': 'Trade ID is required'}), 400
+        if not deal_number:
+            return jsonify({'error': 'Deal Number is required'}), 400
 
         if not serials:
             return jsonify({'error': 'No serials provided'}), 400
 
-        # Validate against trade quantity - must match exactly
-        trade = get_trade_by_id(trade_id)
+        # Validate against trade notional - must match exactly
+        trade = get_trade_by_id(deal_number)
         if trade:
-            trade_quantity = trade.get('quantity', 0)
-            already_assigned = len(get_inventory_by_trade(trade_id))
-            remaining_quantity = trade_quantity - already_assigned
+            trade_notional = trade.get('Notional', 0)
+            already_assigned = len(get_inventory_by_trade(deal_number))
+            remaining_quantity = trade_notional - already_assigned
 
             if len(serials) != remaining_quantity:
                 return jsonify({
-                    'error': f'Serial count ({len(serials)}) must match remaining trade quantity ({remaining_quantity}). Trade requires {trade_quantity} total, {already_assigned} already assigned.'
+                    'error': f'Serial count ({len(serials)}) must match remaining trade quantity ({remaining_quantity}). Trade requires {trade_notional} total, {already_assigned} already assigned.'
                 }), 400
 
         # Inventory metadata
@@ -266,13 +272,13 @@ def create_serials():
         }
 
         success, message, count = create_serials_for_trade(
-            serials, trade_id, inventory_data, warranty_data
+            serials, deal_number, inventory_data, warranty_data
         )
 
         if success:
             # Get updated trade info
-            trade = get_trade_by_id(trade_id)
-            assigned_items = get_inventory_by_trade(trade_id)
+            trade = get_trade_by_id(deal_number)
+            assigned_items = get_inventory_by_trade(deal_number)
 
             return jsonify({
                 'success': True,

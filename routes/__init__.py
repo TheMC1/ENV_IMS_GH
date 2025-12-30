@@ -12,6 +12,7 @@ from routes.dashboard import dashboard_bp
 from routes.settings import settings_bp
 from routes.registry import registry_bp
 from routes.trades import trades_bp
+from routes.reports import reports_bp
 
 __all__ = [
     'auth_bp',
@@ -23,6 +24,7 @@ __all__ = [
     'settings_bp',
     'registry_bp',
     'trades_bp',
+    'reports_bp',
     'login_required',
     'admin_required',
     'write_access_required'

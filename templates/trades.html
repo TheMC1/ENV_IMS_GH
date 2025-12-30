@@ -10,7 +10,8 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+                        url('https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?q=80&w=1920&auto=format&fit=crop') center/cover no-repeat fixed;
         }
 
         .container {
@@ -67,26 +68,54 @@
             padding: 0;
         }
 
+        /* Trades panel body - no horizontal scroll */
+        .trades-panel:first-child .panel-body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
         .trades-table, .inventory-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
         }
 
+        /* Trades table - auto-fit without horizontal scroll */
+        .trades-table {
+            table-layout: fixed;
+        }
+
         .trades-table th, .inventory-table th {
             background: #2c3e50;
             color: #ffffff;
-            padding: 10px 12px;
+            padding: 8px 6px;
             text-align: left;
             position: sticky;
             top: 0;
             z-index: 10;
             border-bottom: 2px solid #1a252f;
-            white-space: nowrap;
             font-weight: 600;
+            font-size: 11px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        .trades-table td, .inventory-table td {
+        .inventory-table th {
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        .trades-table td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #e9ecef;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+
+        .inventory-table td {
             padding: 10px 12px;
             border-bottom: 1px solid #e9ecef;
             white-space: nowrap;
@@ -883,7 +912,7 @@
         const canWrite = ['admin', 'trader'].includes(userRole);
 
         // Display columns for trades
-        const tradeDisplayColumns = ['trade_id', 'client', 'product_type', 'registry', 'vintage', 'quantity', 'price', 'status'];
+        const tradeDisplayColumns = ['DealNumber', 'Counterparty', 'Portfolio', 'Notional', 'TradeType', 'SettleDate', 'Underlier', 'DealCurrency', 'status'];
 
         // Display columns for inventory
         const inventoryDisplayColumns = ['Serial', 'ProjectID', 'Product', 'Registry', 'Vintage', 'IsCustody'];
@@ -949,8 +978,8 @@
                     if (col === 'status') {
                         const statusClass = 'status-' + value.toLowerCase();
                         value = `<span class="status-badge ${statusClass}">${value}</span>`;
-                    } else if (col === 'price' || col === 'total_value') {
-                        value = typeof value === 'number' ? '$' + value.toFixed(2) : value;
+                    } else if (col === 'Notional') {
+                        value = typeof value === 'number' ? value.toLocaleString() : value;
                     }
                     return `<td title="${trade[col] || ''}">${value}</td>`;
                 }).join('');
@@ -960,21 +989,21 @@
                     ? `<span class="assigned-count">${assignedCount}</span>`
                     : '-';
 
-                return `<tr data-trade-id="${trade.trade_id}" class="${selectedTrade?.trade_id === trade.trade_id ? 'selected' : ''}"
-                            onclick="selectTrade('${trade.trade_id}')">
+                return `<tr data-deal-number="${trade.DealNumber}" class="${selectedTrade?.DealNumber === trade.DealNumber ? 'selected' : ''}"
+                            onclick="selectTrade(${trade.DealNumber})">
                     ${cells}
                     <td>${assignedBadge}</td>
                 </tr>`;
             }).join('');
         }
 
-        async function selectTrade(tradeId) {
-            selectedTrade = allTrades.find(t => t.trade_id === tradeId);
+        async function selectTrade(dealNumber) {
+            selectedTrade = allTrades.find(t => t.DealNumber === dealNumber);
             selectedSerials.clear();
 
             // Update visual selection
             document.querySelectorAll('#tradesBody tr').forEach(row => {
-                row.classList.toggle('selected', row.dataset.tradeId === tradeId);
+                row.classList.toggle('selected', row.dataset.dealNumber == dealNumber);
             });
 
             // Load inventory for this trade
@@ -995,7 +1024,7 @@
                 unassignedInventory = applyCustodyFilterToItems(unassignedInventoryFull);
 
                 // Load assigned inventory for selected trade
-                const assignedResp = await fetch(`/api/trades/assigned-inventory/${selectedTrade.trade_id}`);
+                const assignedResp = await fetch(`/api/trades/assigned-inventory/${selectedTrade.DealNumber}`);
                 const assignedData = await assignedResp.json();
                 assignedInventory = assignedData.data || [];
 
@@ -1284,21 +1313,22 @@
             const selectedCount = selectedSerials.size;
             const isUnassignedTab = currentTab === 'unassigned';
 
-            const tradeQuantity = trade.quantity || 0;
+            const tradeNotional = trade.Notional || 0;
             const alreadyAssigned = trade._assigned_count || 0;
-            const remainingQuantity = tradeQuantity - alreadyAssigned;
+            const remainingQuantity = tradeNotional - alreadyAssigned;
             const isFullyAllocated = remainingQuantity <= 0;
 
             let html = `
                 <div class="trade-details">
-                    <h4>Trade: ${trade.trade_id}</h4>
-                    <p>Client: <span class="value">${trade.client || 'N/A'}</span></p>
-                    <p>Counterparty: <span class="value">${trade.counterparty || 'N/A'}</span></p>
-                    <p>Quantity: <span class="value">${tradeQuantity}</span></p>
+                    <h4>Deal: ${trade.DealNumber}</h4>
+                    <p>Counterparty: <span class="value">${trade.Counterparty || 'N/A'}</span></p>
+                    <p>Portfolio: <span class="value">${trade.Portfolio || 'N/A'}</span></p>
+                    <p>Trade Type: <span class="value">${trade.TradeType || 'N/A'}</span></p>
+                    <p>Notional: <span class="value">${tradeNotional.toLocaleString()}</span></p>
                     <p>Status: <span class="value">${trade.status || 'N/A'}</span></p>
                     <p>Currently Assigned: <span class="value">${alreadyAssigned}</span></p>
                     <p style="font-weight: 600; color: ${isFullyAllocated ? '#28a745' : '#dc3545'};">
-                        Remaining: <span class="value">${remainingQuantity}</span>
+                        Remaining: <span class="value">${remainingQuantity.toLocaleString()}</span>
                         ${isFullyAllocated ? ' ✓ Fully Allocated' : ''}
                     </p>
                 </div>
@@ -1325,7 +1355,7 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Sell Client</label>
-                                    <input type="text" id="sellClient" value="${trade.client || ''}" placeholder="Client name">
+                                    <input type="text" id="sellClient" value="${trade.Counterparty || ''}" placeholder="Client name">
                                 </div>
                             </div>
                             <div class="form-row">
@@ -1385,7 +1415,7 @@
                                 New serials will be created and assigned to this trade with BUY warranty information.
                             </p>
                             ${!isFullyAllocated ? `<p style="font-size: 13px; color: #1565c0; font-weight: 600;">
-                                Required: ${remainingQuantity} serial(s)
+                                Required: ${remainingQuantity.toLocaleString()} serial(s)
                             </p>` : ''}
                         </div>
                         <button class="btn-assign btn-create-serials" onclick="openCreateSerialsModal()" ${isFullyAllocated ? 'disabled' : ''}>
@@ -1427,20 +1457,20 @@
         async function assignSelected() {
             if (!selectedTrade || selectedSerials.size === 0) return;
 
-            // Validate that assignment doesn't exceed trade quantity
-            const tradeQuantity = selectedTrade.quantity || 0;
+            // Validate that assignment doesn't exceed trade notional
+            const tradeNotional = selectedTrade.Notional || 0;
             const alreadyAssigned = selectedTrade._assigned_count || 0;
-            const remainingQuantity = tradeQuantity - alreadyAssigned;
+            const remainingQuantity = tradeNotional - alreadyAssigned;
             const selectedCount = selectedSerials.size;
 
             if (selectedCount > remainingQuantity) {
-                showWarning(`Cannot assign ${selectedCount} item(s). Only ${remainingQuantity} remaining for this trade (${tradeQuantity} total, ${alreadyAssigned} already assigned).`);
+                showWarning(`Cannot assign ${selectedCount} item(s). Only ${remainingQuantity} remaining for this trade (${tradeNotional} total, ${alreadyAssigned} already assigned).`);
                 return;
             }
 
             // Sell mode - only send SELL warranty data
             const payload = {
-                trade_id: selectedTrade.trade_id,
+                deal_number: selectedTrade.DealNumber,
                 serials: Array.from(selectedSerials),
                 sell_warranty_start: document.getElementById('sellStart')?.value || null,
                 sell_warranty_end: document.getElementById('sellEnd')?.value || null,
@@ -1459,7 +1489,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showSuccess(`Successfully assigned ${result.assigned_count} item(s) to trade ${selectedTrade.trade_id}`);
+                    showSuccess(`Successfully assigned ${result.assigned_count} item(s) to deal ${selectedTrade.DealNumber}`);
                     selectedSerials.clear();
                     await loadTrades();
                     await loadInventory();
@@ -1877,9 +1907,9 @@
             }
 
             const trade = selectedTrade;
-            const tradeQuantity = trade.quantity || 0;
+            const tradeNotional = trade.Notional || 0;
             const alreadyAssigned = trade._assigned_count || 0;
-            const remainingQuantity = tradeQuantity - alreadyAssigned;
+            const remainingQuantity = tradeNotional - alreadyAssigned;
 
             if (remainingQuantity <= 0) {
                 showInfo('This trade is fully allocated. No more serials can be created.');
@@ -1892,27 +1922,27 @@
             const today = new Date().toISOString().split('T')[0];
 
             // Pre-fill trade info
-            document.getElementById('newSerialTradeId').value = trade.trade_id;
-            document.getElementById('newSerialBuyClient').value = trade.client || '';  // Default to Client name
-            document.getElementById('newSerialBuyStart').value = trade.buy_warranty_start || '';  // Keep empty by default
-            document.getElementById('newSerialBuyEnd').value = trade.buy_warranty_end || '';  // Keep empty by default
+            document.getElementById('newSerialTradeId').value = trade.DealNumber;
+            document.getElementById('newSerialBuyClient').value = trade.Counterparty || '';  // Default to Counterparty name
+            document.getElementById('newSerialBuyStart').value = '';  // Keep empty by default
+            document.getElementById('newSerialBuyEnd').value = '';  // Keep empty by default
 
             // Clear/set other fields
             document.getElementById('newSerialInput').value = '';
             document.getElementById('newSerialInput').placeholder = `Enter exactly ${remainingQuantity} serial(s) - e.g., ABC100-ABC${99 + remainingQuantity}`;
             document.getElementById('newSerialMarket').value = '';
-            document.getElementById('newSerialRegistry').value = trade.registry || '';
-            document.getElementById('newSerialProduct').value = trade.product_type || '';
-            document.getElementById('newSerialProjectId').value = trade.project_id || '';
-            document.getElementById('newSerialProjectType').value = trade.project_type || '';
-            document.getElementById('newSerialProtocol').value = trade.protocol || '';
-            document.getElementById('newSerialProjectName').value = trade.project_name || '';
-            document.getElementById('newSerialVintage').value = trade.vintage || '';
+            document.getElementById('newSerialRegistry').value = '';
+            document.getElementById('newSerialProduct').value = '';
+            document.getElementById('newSerialProjectId').value = '';
+            document.getElementById('newSerialProjectType').value = '';
+            document.getElementById('newSerialProtocol').value = '';
+            document.getElementById('newSerialProjectName').value = '';
+            document.getElementById('newSerialVintage').value = '';
             document.getElementById('newSerialCustody').value = 'False';  // Default to False
 
             // Update the required quantity display
             document.getElementById('requiredQuantityDisplay').textContent =
-                `Required: ${remainingQuantity} serial(s) (Trade qty: ${tradeQuantity}, Already assigned: ${alreadyAssigned})`;
+                `Required: ${remainingQuantity} serial(s) (Trade notional: ${tradeNotional.toLocaleString()}, Already assigned: ${alreadyAssigned})`;
 
             // Initialize the live counter
             requiredSerialCount = remainingQuantity;
@@ -1940,19 +1970,19 @@
                 return;
             }
 
-            // Validate that serial count matches trade quantity
-            const tradeQuantity = selectedTrade.quantity || 0;
+            // Validate that serial count matches trade notional
+            const tradeNotional = selectedTrade.Notional || 0;
             const alreadyAssigned = selectedTrade._assigned_count || 0;
-            const remainingQuantity = tradeQuantity - alreadyAssigned;
+            const remainingQuantity = tradeNotional - alreadyAssigned;
 
             if (serials.length !== remainingQuantity) {
-                showWarning(`Serial count (${serials.length}) must match the remaining trade quantity (${remainingQuantity}). Trade requires ${tradeQuantity} total, ${alreadyAssigned} already assigned.`);
+                showWarning(`Serial count (${serials.length}) must match the remaining trade quantity (${remainingQuantity}). Trade requires ${tradeNotional} total, ${alreadyAssigned} already assigned.`);
                 return;
             }
 
             const payload = {
                 serials: serials,
-                trade_id: document.getElementById('newSerialTradeId').value,
+                deal_number: document.getElementById('newSerialTradeId').value,
                 market: document.getElementById('newSerialMarket').value,
                 registry: document.getElementById('newSerialRegistry').value,
                 product: document.getElementById('newSerialProduct').value,
@@ -1978,7 +2008,7 @@
 
                 if (result.success) {
                     closeCreateSerialsModal();
-                    showSuccess(`Successfully created ${result.created_count} serial(s) and assigned to trade ${selectedTrade.trade_id}`);
+                    showSuccess(`Successfully created ${result.created_count} serial(s) and assigned to deal ${selectedTrade.DealNumber}`);
                     await loadTrades();
                     await loadInventory();
                     updateAssignmentPanel();
@@ -2089,7 +2119,7 @@
                         <div class="section-title">Buy Warranty Information</div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Trade ID (Auto)</label>
+                                <label>Deal Number (Auto)</label>
                                 <input type="text" id="newSerialTradeId" readonly style="background: #f0f0f0;">
                             </div>
                             <div class="form-group">

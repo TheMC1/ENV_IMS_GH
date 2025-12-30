@@ -16,11 +16,15 @@ def get_trades_dataframe():
     Fetch trades data from external source.
 
     Returns a list of dictionaries with trade information.
-    Each trade should have at minimum:
-        - trade_id: Unique identifier for the trade
-        - client: Client name
-        - price: Price per unit
-        - quantity: Number of units
+    Core schema fields:
+        - DealNumber (int): Unique deal identifier
+        - Counterparty (str): Trading counterparty name
+        - Portfolio (str): Portfolio/book name
+        - Notional (int): Notional amount
+        - TradeType (str): Type of trade (Spot, Forward, Option, etc.)
+        - SettleDate (date): Settlement date
+        - Underlier (str): Underlying asset/instrument
+        - DealCurrency (str): Currency code (USD, EUR, GBP, etc.)
 
     Additional metadata fields can be added as needed.
     The schema is flexible and will be displayed dynamically.
@@ -33,90 +37,72 @@ def get_trades_dataframe():
     # =========================================================================
 
     # Generate sample trades for demonstration
+    # Schema: DealNumber(int), Counterparty(str), Portfolio(str), Notional(int),
+    #         TradeType(str), SettleDate(date), Underlier(str), DealCurrency(str)
     dummy_trades = [
         {
-            'trade_id': 'TRD-2024-001',
-            'client': 'Acme Corporation',
-            'counterparty': 'Green Energy Ltd',
-            'trade_date': '2024-12-15',
-            'settlement_date': '2024-12-20',
-            'product_type': 'VCU',
-            'registry': 'Verra',
-            'vintage': '2023',
-            'quantity': 1000,
-            'price': 12.50,
-            'total_value': 12500.00,
+            'DealNumber': 1001,
+            'Counterparty': 'Green Energy Ltd',
+            'Portfolio': 'Carbon Trading',
+            'Notional': 125000,
+            'TradeType': 'Spot',
+            'SettleDate': '2024-12-20',
+            'Underlier': 'VCU-2023',
+            'DealCurrency': 'USD',
             'status': 'Pending',
-            'buy_warranty_start': '2024-12-20',
-            'buy_warranty_end': '2025-12-20',
+            'trader': 'John Smith',
             'notes': 'Q4 carbon offset purchase'
         },
         {
-            'trade_id': 'TRD-2024-002',
-            'client': 'Beta Industries',
-            'counterparty': 'Carbon Solutions Inc',
-            'trade_date': '2024-12-18',
-            'settlement_date': '2024-12-23',
-            'product_type': 'VCU',
-            'registry': 'Gold Standard',
-            'vintage': '2022',
-            'quantity': 500,
-            'price': 15.00,
-            'total_value': 7500.00,
+            'DealNumber': 1002,
+            'Counterparty': 'Carbon Solutions Inc',
+            'Portfolio': 'Renewables',
+            'Notional': 75000,
+            'TradeType': 'Forward',
+            'SettleDate': '2024-12-23',
+            'Underlier': 'REC-SOLAR',
+            'DealCurrency': 'EUR',
             'status': 'Confirmed',
-            'buy_warranty_start': '2024-12-23',
-            'buy_warranty_end': '2025-06-23',
+            'trader': 'Jane Doe',
             'notes': 'Renewable energy credits'
         },
         {
-            'trade_id': 'TRD-2024-003',
-            'client': 'Gamma Holdings',
-            'counterparty': 'EcoCredits LLC',
-            'trade_date': '2024-12-20',
-            'settlement_date': '2024-12-27',
-            'product_type': 'REC',
-            'registry': 'ACR',
-            'vintage': '2024',
-            'quantity': 2500,
-            'price': 8.75,
-            'total_value': 21875.00,
+            'DealNumber': 1003,
+            'Counterparty': 'EcoCredits LLC',
+            'Portfolio': 'Carbon Trading',
+            'Notional': 218750,
+            'TradeType': 'Spot',
+            'SettleDate': '2024-12-27',
+            'Underlier': 'ACR-FOREST',
+            'DealCurrency': 'USD',
             'status': 'Pending',
-            'buy_warranty_start': '2024-12-27',
-            'buy_warranty_end': '2025-12-27',
+            'trader': 'Mike Johnson',
             'notes': 'Forest conservation project'
         },
         {
-            'trade_id': 'TRD-2024-004',
-            'client': 'Delta Corp',
-            'counterparty': 'Sustainability Partners',
-            'trade_date': '2024-12-22',
-            'settlement_date': '2024-12-29',
-            'product_type': 'VCU',
-            'registry': 'Verra',
-            'vintage': '2023',
-            'quantity': 750,
-            'price': 11.25,
-            'total_value': 8437.50,
+            'DealNumber': 1004,
+            'Counterparty': 'Sustainability Partners',
+            'Portfolio': 'Biodiversity',
+            'Notional': 84375,
+            'TradeType': 'Option',
+            'SettleDate': '2024-12-29',
+            'Underlier': 'VCU-BIO',
+            'DealCurrency': 'GBP',
             'status': 'Allocated',
-            'buy_warranty_start': '2024-12-29',
-            'buy_warranty_end': '2025-06-29',
+            'trader': 'Sarah Wilson',
             'notes': 'Biodiversity project credits'
         },
         {
-            'trade_id': 'TRD-2024-005',
-            'client': 'Epsilon Energy',
-            'counterparty': 'Net Zero Trading',
-            'trade_date': '2024-12-28',
-            'settlement_date': '2025-01-05',
-            'product_type': 'CER',
-            'registry': 'CAR',
-            'vintage': '2024',
-            'quantity': 3000,
-            'price': 9.50,
-            'total_value': 28500.00,
+            'DealNumber': 1005,
+            'Counterparty': 'Net Zero Trading',
+            'Portfolio': 'Methane',
+            'Notional': 285000,
+            'TradeType': 'Forward',
+            'SettleDate': '2025-01-05',
+            'Underlier': 'CER-METHANE',
+            'DealCurrency': 'USD',
             'status': 'Pending',
-            'buy_warranty_start': '2025-01-05',
-            'buy_warranty_end': '2026-01-05',
+            'trader': 'Tom Brown',
             'notes': 'Methane capture project'
         }
     ]
@@ -146,19 +132,19 @@ def get_trades_dataframe():
     # =========================================================================
 
 
-def get_trade_by_id(trade_id):
+def get_trade_by_id(deal_number):
     """
-    Get a specific trade by its ID.
+    Get a specific trade by its DealNumber.
 
     Args:
-        trade_id: The unique trade identifier
+        deal_number: The unique deal number identifier
 
     Returns:
         Trade dictionary or None if not found
     """
     trades = get_trades_dataframe()
     for trade in trades:
-        if trade.get('trade_id') == trade_id:
+        if trade.get('DealNumber') == deal_number:
             return trade
     return None
 
@@ -172,20 +158,16 @@ def get_trade_headers():
     """
     # Define preferred column order
     preferred_order = [
-        'trade_id',
-        'client',
-        'counterparty',
-        'trade_date',
-        'settlement_date',
-        'product_type',
-        'registry',
-        'vintage',
-        'quantity',
-        'price',
-        'total_value',
+        'DealNumber',
+        'Counterparty',
+        'Portfolio',
+        'Notional',
+        'TradeType',
+        'SettleDate',
+        'Underlier',
+        'DealCurrency',
         'status',
-        'buy_warranty_start',
-        'buy_warranty_end',
+        'trader',
         'notes'
     ]
 
