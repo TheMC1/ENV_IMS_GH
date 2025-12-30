@@ -354,17 +354,29 @@ def init_inventory_database():
             vintage TEXT,
             serial TEXT UNIQUE,
             is_custody TEXT,
+            is_assigned INTEGER DEFAULT 0,
+            trade_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # Add vintage column if it doesn't exist (for existing databases)
+    # Add columns if they don't exist (for existing databases)
     cursor.execute("PRAGMA table_info(inventory)")
     inventory_columns = [column[1] for column in cursor.fetchall()]
     if 'vintage' not in inventory_columns:
         try:
             cursor.execute("ALTER TABLE inventory ADD COLUMN vintage TEXT")
+        except:
+            pass
+    if 'is_assigned' not in inventory_columns:
+        try:
+            cursor.execute("ALTER TABLE inventory ADD COLUMN is_assigned INTEGER DEFAULT 0")
+        except:
+            pass
+    if 'trade_id' not in inventory_columns:
+        try:
+            cursor.execute("ALTER TABLE inventory ADD COLUMN trade_id TEXT")
         except:
             pass
 
@@ -460,7 +472,8 @@ def get_all_inventory_items():
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, market, registry, product, project_id, project_type,
-                   protocol, project_name, vintage, serial, is_custody
+                   protocol, project_name, vintage, serial, is_custody,
+                   is_assigned, trade_id
             FROM inventory
             ORDER BY id
         """)
@@ -480,7 +493,9 @@ def get_all_inventory_items():
                 'ProjectName': row['project_name'] or '',
                 'Vintage': row['vintage'] or '',
                 'Serial': row['serial'] or '',
-                'IsCustody': row['is_custody'] or ''
+                'IsCustody': row['is_custody'] or '',
+                'IsAssigned': 'True' if row['is_assigned'] else 'False',
+                'TradeID': row['trade_id'] or ''
             }
             items.append(item_data)
 
@@ -513,7 +528,9 @@ def get_inventory_headers():
         'ProjectName',
         'Vintage',
         'Serial',
-        'IsCustody'
+        'IsCustody',
+        'IsAssigned',
+        'TradeID'
     ]
 
     # Order headers according to preferred order
@@ -542,11 +559,16 @@ def add_inventory_item(item_data):
         # Get Serial for warranty creation
         serial = clean_data.get('Serial', '')
 
+        # Handle IsAssigned - convert string to integer
+        is_assigned_str = clean_data.get('IsAssigned', 'False')
+        is_assigned = 1 if is_assigned_str in ['True', 'true', '1', True] else 0
+
         # Insert into individual columns
         cursor.execute("""
             INSERT INTO inventory (market, registry, product, project_id, project_type,
-                                 protocol, project_name, vintage, serial, is_custody)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 protocol, project_name, vintage, serial, is_custody,
+                                 is_assigned, trade_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             clean_data.get('Market', ''),
             clean_data.get('Registry', ''),
@@ -557,7 +579,9 @@ def add_inventory_item(item_data):
             clean_data.get('ProjectName', ''),
             clean_data.get('Vintage', ''),
             clean_data.get('Serial', ''),
-            clean_data.get('IsCustody', '')
+            clean_data.get('IsCustody', ''),
+            is_assigned,
+            clean_data.get('TradeID', '')
         ))
 
         item_id = cursor.lastrowid
@@ -602,11 +626,16 @@ def update_inventory_item(item_id, item_data):
         old_serial = row['serial'] or ''
         new_serial = clean_data.get('Serial', '')
 
+        # Handle IsAssigned - convert string to integer
+        is_assigned_str = clean_data.get('IsAssigned', 'False')
+        is_assigned = 1 if is_assigned_str in ['True', 'true', '1', True] else 0
+
         # Update individual columns
         cursor.execute("""
             UPDATE inventory
             SET market = ?, registry = ?, product = ?, project_id = ?, project_type = ?,
                 protocol = ?, project_name = ?, vintage = ?, serial = ?, is_custody = ?,
+                is_assigned = ?, trade_id = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (
@@ -620,6 +649,8 @@ def update_inventory_item(item_id, item_data):
             clean_data.get('Vintage', ''),
             new_serial,
             clean_data.get('IsCustody', ''),
+            is_assigned,
+            clean_data.get('TradeID', ''),
             item_id
         ))
 
@@ -742,10 +773,14 @@ def restore_inventory_backup(backup_id):
         # Restore items from backup
         for item in backup_items:
             clean_data = {k: v for k, v in item.items() if k != '_row_index'}
+            # Handle IsAssigned - convert string to integer
+            is_assigned_str = clean_data.get('IsAssigned', 'False')
+            is_assigned = 1 if is_assigned_str in ['True', 'true', '1', True] else 0
             cursor.execute("""
                 INSERT INTO inventory (market, registry, product, project_id, project_type,
-                                     protocol, project_name, vintage, serial, is_custody)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     protocol, project_name, vintage, serial, is_custody,
+                                     is_assigned, trade_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 clean_data.get('Market', ''),
                 clean_data.get('Registry', ''),
@@ -756,7 +791,9 @@ def restore_inventory_backup(backup_id):
                 clean_data.get('ProjectName', ''),
                 clean_data.get('Vintage', ''),
                 clean_data.get('Serial', ''),
-                clean_data.get('IsCustody', '')
+                clean_data.get('IsCustody', ''),
+                is_assigned,
+                clean_data.get('TradeID', '')
             ))
 
         conn.commit()
@@ -1109,6 +1146,269 @@ def save_user_page_settings(username, page, settings):
     except Exception as e:
         print(f"Error saving user settings: {e}")
         return False, str(e)
+
+
+# Trade Assignment Functions
+
+def assign_inventory_to_trade(serials, trade_id, warranty_data=None):
+    """
+    Assign inventory items to a trade by serial numbers.
+
+    Args:
+        serials: List of serial numbers to assign
+        trade_id: The trade ID to assign to
+        warranty_data: Optional dict with warranty dates to set
+            {
+                'buy_start': 'YYYY-MM-DD',
+                'buy_end': 'YYYY-MM-DD',
+                'sell_start': 'YYYY-MM-DD',
+                'sell_end': 'YYYY-MM-DD',
+                'buy_client': 'client name',
+                'sell_client': 'client name'
+            }
+
+    Returns:
+        (success, message, count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        assigned_count = 0
+
+        for serial in serials:
+            # Update inventory record
+            cursor.execute("""
+                UPDATE inventory
+                SET is_assigned = 1, trade_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE serial = ?
+            """, (trade_id, serial))
+
+            if cursor.rowcount > 0:
+                assigned_count += 1
+
+                # Update warranty if warranty_data provided
+                if warranty_data:
+                    cursor.execute("""
+                        UPDATE warranties
+                        SET buy_start = COALESCE(?, buy_start),
+                            buy_end = COALESCE(?, buy_end),
+                            sell_start = COALESCE(?, sell_start),
+                            sell_end = COALESCE(?, sell_end),
+                            buy_tradeid = COALESCE(?, buy_tradeid),
+                            sell_tradeid = COALESCE(?, sell_tradeid),
+                            buy_client = COALESCE(?, buy_client),
+                            sell_client = COALESCE(?, sell_client),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE serial = ?
+                    """, (
+                        warranty_data.get('buy_start'),
+                        warranty_data.get('buy_end'),
+                        warranty_data.get('sell_start'),
+                        warranty_data.get('sell_end'),
+                        trade_id if warranty_data.get('set_buy_tradeid') else None,
+                        trade_id if warranty_data.get('set_sell_tradeid') else None,
+                        warranty_data.get('buy_client'),
+                        warranty_data.get('sell_client'),
+                        serial
+                    ))
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Successfully assigned {assigned_count} item(s) to trade {trade_id}", assigned_count
+    except Exception as e:
+        return False, str(e), 0
+
+
+def unassign_inventory_from_trade(serials):
+    """
+    Unassign inventory items from their trades.
+
+    Args:
+        serials: List of serial numbers to unassign
+
+    Returns:
+        (success, message, count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        unassigned_count = 0
+
+        for serial in serials:
+            cursor.execute("""
+                UPDATE inventory
+                SET is_assigned = 0, trade_id = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE serial = ?
+            """, (serial,))
+
+            if cursor.rowcount > 0:
+                unassigned_count += 1
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Successfully unassigned {unassigned_count} item(s)", unassigned_count
+    except Exception as e:
+        return False, str(e), 0
+
+
+def get_inventory_by_trade(trade_id):
+    """Get all inventory items assigned to a specific trade"""
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, market, registry, product, project_id, project_type,
+                   protocol, project_name, vintage, serial, is_custody,
+                   is_assigned, trade_id
+            FROM inventory
+            WHERE trade_id = ?
+            ORDER BY id
+        """, (trade_id,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        items = []
+        for row in rows:
+            item_data = {
+                '_row_index': row['id'],
+                'Market': row['market'] or '',
+                'Registry': row['registry'] or '',
+                'Product': row['product'] or '',
+                'ProjectID': row['project_id'] or '',
+                'ProjectType': row['project_type'] or '',
+                'Protocol': row['protocol'] or '',
+                'ProjectName': row['project_name'] or '',
+                'Vintage': row['vintage'] or '',
+                'Serial': row['serial'] or '',
+                'IsCustody': row['is_custody'] or '',
+                'IsAssigned': 'True' if row['is_assigned'] else 'False',
+                'TradeID': row['trade_id'] or ''
+            }
+            items.append(item_data)
+
+        return items
+    except Exception as e:
+        print(f"Error getting inventory by trade: {e}")
+        return []
+
+
+def get_unassigned_inventory():
+    """Get all unassigned inventory items"""
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, market, registry, product, project_id, project_type,
+                   protocol, project_name, vintage, serial, is_custody,
+                   is_assigned, trade_id
+            FROM inventory
+            WHERE is_assigned = 0 OR is_assigned IS NULL
+            ORDER BY id
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        items = []
+        for row in rows:
+            item_data = {
+                '_row_index': row['id'],
+                'Market': row['market'] or '',
+                'Registry': row['registry'] or '',
+                'Product': row['product'] or '',
+                'ProjectID': row['project_id'] or '',
+                'ProjectType': row['project_type'] or '',
+                'Protocol': row['protocol'] or '',
+                'ProjectName': row['project_name'] or '',
+                'Vintage': row['vintage'] or '',
+                'Serial': row['serial'] or '',
+                'IsCustody': row['is_custody'] or '',
+                'IsAssigned': 'False',
+                'TradeID': ''
+            }
+            items.append(item_data)
+
+        return items
+    except Exception as e:
+        print(f"Error getting unassigned inventory: {e}")
+        return []
+
+
+def create_serials_for_trade(serials, trade_id, inventory_data, warranty_data):
+    """
+    Create new inventory items and assign them to a trade with BUY warranty info.
+
+    Args:
+        serials: List of serial numbers to create
+        trade_id: Trade ID to assign to
+        inventory_data: Dict with inventory metadata (market, registry, product, etc.)
+        warranty_data: Dict with buy warranty info (buy_client, buy_start, buy_end)
+
+    Returns:
+        (success, message, created_count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        created_count = 0
+        skipped_serials = []
+
+        for serial in serials:
+            # Check if serial already exists
+            cursor.execute("SELECT id FROM inventory WHERE serial = ?", (serial,))
+            if cursor.fetchone():
+                skipped_serials.append(serial)
+                continue
+
+            # Insert new inventory item
+            cursor.execute("""
+                INSERT INTO inventory (market, registry, product, project_id, project_type,
+                                     protocol, project_name, vintage, serial, is_custody,
+                                     is_assigned, trade_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            """, (
+                inventory_data.get('market', ''),
+                inventory_data.get('registry', ''),
+                inventory_data.get('product', ''),
+                inventory_data.get('project_id', ''),
+                inventory_data.get('project_type', ''),
+                inventory_data.get('protocol', ''),
+                inventory_data.get('project_name', ''),
+                inventory_data.get('vintage', ''),
+                serial,
+                inventory_data.get('is_custody', 'Yes'),
+                trade_id
+            ))
+
+            # Create warranty record with BUY info
+            cursor.execute("""
+                INSERT OR REPLACE INTO warranties (
+                    serial, buy_tradeid, buy_client, buy_start, buy_end
+                )
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                serial,
+                trade_id,
+                warranty_data.get('buy_client', ''),
+                warranty_data.get('buy_start', ''),
+                warranty_data.get('buy_end', '')
+            ))
+
+            created_count += 1
+
+        conn.commit()
+        conn.close()
+
+        if skipped_serials:
+            return True, f"Created {created_count} serial(s). Skipped {len(skipped_serials)} existing serial(s)", created_count
+        return True, f"Successfully created {created_count} serial(s)", created_count
+    except Exception as e:
+        return False, str(e), 0
+
 
 if __name__ == '__main__':
     init_database()

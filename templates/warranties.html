@@ -376,6 +376,68 @@
             justify-content: center;
         }
 
+        /* Progress Modal Styles */
+        .progress-modal {
+            z-index: 2500 !important;
+        }
+
+        .progress-modal .modal-content {
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-bar-wrapper {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 24px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .progress-status {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .progress-detail {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .progress-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e9ecef;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         .summary-list {
             max-height: 400px;
             overflow-y: auto;
@@ -687,6 +749,27 @@
                 </div>
             </div>
 
+            <!-- Progress Modal -->
+            <div id="progressModal" class="modal progress-modal">
+                <div class="modal-content">
+                    <div class="modal-body">
+                        <h3 style="margin-bottom: 20px; color: #333;">Saving Changes</h3>
+                        <div class="progress-container">
+                            <div class="progress-status" id="progressStatus">
+                                <span class="progress-spinner"></span>
+                                <span id="progressStatusText">Preparing...</span>
+                            </div>
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;">
+                                    <span id="progressPercent">0%</span>
+                                </div>
+                            </div>
+                            <div class="progress-detail" id="progressDetail">Initializing...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Custom Confirm Modal -->
             <div id="customConfirmModal" class="modal custom-confirm-modal">
                 <div class="modal-content">
@@ -827,6 +910,30 @@
         function closeCustomAlert() {
             const modal = document.getElementById('customAlertModal');
             modal.style.display = 'none';
+        }
+
+        // Progress Modal Functions
+        function showProgress() {
+            const modal = document.getElementById('progressModal');
+            modal.style.display = 'flex';
+            updateProgress(0, 'Preparing...', 'Initializing...');
+        }
+
+        function hideProgress() {
+            const modal = document.getElementById('progressModal');
+            modal.style.display = 'none';
+        }
+
+        function updateProgress(percent, status, detail) {
+            const fill = document.getElementById('progressBarFill');
+            const percentText = document.getElementById('progressPercent');
+            const statusText = document.getElementById('progressStatusText');
+            const detailText = document.getElementById('progressDetail');
+
+            fill.style.width = percent + '%';
+            percentText.textContent = Math.round(percent) + '%';
+            if (status) statusText.textContent = status;
+            if (detail) detailText.textContent = detail;
         }
 
         // Custom Confirm Function
@@ -2374,9 +2481,21 @@
             const modal = document.getElementById('commitModal');
             modal.style.display = 'none';
 
+            // Show progress modal
+            showProgress();
+
             try {
+                const totalChanges = Object.keys(pendingChanges.modified).length +
+                                    pendingChanges.added.length +
+                                    pendingChanges.deleted.length;
+
+                // Stage 1: Preparing (0-20%)
+                updateProgress(5, 'Preparing changes...', `Processing ${totalChanges} change(s)...`);
+                await new Promise(r => setTimeout(r, 100)); // Small delay for UI update
+
                 // Build change summary
                 const changeSummary = buildChangeSummary();
+                updateProgress(10, 'Preparing changes...', 'Building change summary...');
 
                 // Prepare modifications for batch commit
                 const modifications = {};
@@ -2394,7 +2513,12 @@
                     return rowData;
                 });
 
-                // Send batch commit
+                updateProgress(20, 'Preparing changes...', 'Changes prepared successfully');
+                await new Promise(r => setTimeout(r, 100));
+
+                // Stage 2: Sending to server (20-70%)
+                updateProgress(25, 'Saving to database...', `Sending ${totalChanges} change(s) to server...`);
+
                 const response = await fetch('/api/warranties/commit-batch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2406,22 +2530,34 @@
                     })
                 });
 
+                updateProgress(70, 'Processing response...', 'Server processing complete');
+
                 const result = await response.json();
 
-                if (result.error) {
-                    showAlert('Error committing changes: ' + result.error, 'error');
-                } else {
-                    const totalChanges = Object.keys(pendingChanges.modified).length +
-                                        pendingChanges.added.length +
-                                        pendingChanges.deleted.length;
-                    showAlert(`All changes committed successfully! (${totalChanges} operation${totalChanges > 1 ? 's' : ''})`, 'success');
-                }
+                // Stage 3: Reloading data (70-95%)
+                updateProgress(75, 'Reloading warranties...', 'Fetching updated data...');
 
                 // Reload inventory
                 await loadInventory();
 
+                updateProgress(95, 'Finishing up...', 'Almost done...');
+                await new Promise(r => setTimeout(r, 200));
+
+                // Stage 4: Complete (100%)
+                updateProgress(100, 'Complete!', `${totalChanges} change(s) saved successfully`);
+                await new Promise(r => setTimeout(r, 500));
+
+                hideProgress();
+
+                if (result.error) {
+                    showAlert('Error committing changes: ' + result.error, 'error');
+                } else {
+                    showAlert(`All changes committed successfully! (${totalChanges} operation${totalChanges > 1 ? 's' : ''})`, 'success');
+                }
+
             } catch (error) {
                 console.error('Commit error:', error);
+                hideProgress();
                 showAlert('Failed to commit changes', 'error');
             }
         }

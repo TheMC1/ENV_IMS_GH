@@ -18,7 +18,8 @@ from routes import (
     warranties_bp,
     dashboard_bp,
     settings_bp,
-    registry_bp
+    registry_bp,
+    trades_bp
 )
 
 # Create Flask application
@@ -51,6 +52,7 @@ app.register_blueprint(warranties_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(registry_bp)
+app.register_blueprint(trades_bp)
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)

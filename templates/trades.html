@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trades - Carbon IMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            max-width: none;
+            width: 100%;
+            height: 100vh;
+            padding: 0;
+            display: flex;
+            align-items: stretch;
+        }
+
+        .trades-box {
+            background: white;
+            padding: 30px;
+            width: 100%;
+            height: 100vh;
+            max-width: none;
+            border-radius: 0;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .trades-content {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .trades-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+        }
+
+        .trades-table, .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .trades-table th, .inventory-table th {
+            background: #2c3e50;
+            color: #ffffff;
+            padding: 10px 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 2px solid #1a252f;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .trades-table td, .inventory-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e9ecef;
+            white-space: nowrap;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .trades-table tr:hover, .inventory-table tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .inventory-table tr.selected-row {
+            background-color: #e8f5e9;
+        }
+
+        .trades-table tr.selected {
+            background-color: #e3f2fd;
+        }
+
+        .trades-table tr {
+            cursor: pointer;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-confirmed { background: #d4edda; color: #155724; }
+        .status-allocated { background: #cce5ff; color: #004085; }
+        .status-completed { background: #d1e7dd; color: #0f5132; }
+
+        .assignment-section {
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .assignment-header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .assignment-body {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .trade-details {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .trade-details h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .trade-details p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .trade-details .value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .warranty-form {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .warranty-form h5 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .selected-items {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .selected-items h5 {
+            margin: 0 0 10px 0;
+            color: #2e7d32;
+        }
+
+        .selected-list {
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .selected-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px;
+            background: white;
+            margin-bottom: 3px;
+            border-radius: 3px;
+        }
+
+        .btn-assign {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-assign:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-assign:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .btn-unassign {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .btn-unassign:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        }
+
+        .checkbox-cell {
+            width: 30px;
+            text-align: center;
+        }
+
+        .checkbox-cell input {
+            cursor: pointer;
+        }
+
+        .no-selection {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .assigned-count {
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            border-bottom: 2px solid transparent;
+            margin-bottom: 0;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.2);
+            border-bottom-color: #ffffff;
+            font-weight: 600;
+        }
+
+        .tab:hover:not(.active) {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .selection-toolbar {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .selection-toolbar label {
+            font-size: 13px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .selection-toolbar select {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .selection-toolbar .btn-select-group {
+            padding: 6px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .selection-toolbar .btn-select-group:hover {
+            background: #5a6fd6;
+        }
+
+        .selection-toolbar .btn-clear {
+            padding: 6px 12px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .selection-toolbar .btn-clear:hover {
+            background: #5a6268;
+        }
+
+        .selection-toolbar .selection-count {
+            font-size: 13px;
+            color: #28a745;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .filter-criteria {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        .filter-tag .remove-filter {
+            cursor: pointer;
+            font-weight: bold;
+            color: #c62828;
+            margin-left: 3px;
+        }
+
+        .filter-tag .remove-filter:hover {
+            color: #b71c1c;
+        }
+
+        .serial-input-section {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .serial-input-section label {
+            font-size: 13px;
+            color: #555;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .serial-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .serial-input-row textarea {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: monospace;
+            resize: vertical;
+            min-height: 36px;
+            max-height: 100px;
+        }
+
+        .serial-input-row .btn-select-serials {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .serial-input-row .btn-select-serials:hover {
+            background: #5a6fd6;
+        }
+
+        .serial-input-hint {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .selected-ranges {
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .selected-range-item {
+            display: inline-block;
+            background: white;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 3px;
+            border: 1px solid #c8e6c9;
+        }
+
+        /* Mode Toggle Styles */
+        .mode-toggle {
+            display: flex;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 2px solid #667eea;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            background: white;
+            color: #667eea;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: #f0f4ff;
+        }
+
+        .mode-btn.sell-mode.active {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-color: #28a745;
+        }
+
+        .mode-btn.buy-mode.active {
+            background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+            border-color: #007bff;
+        }
+
+        .warranty-form.buy-mode {
+            background: #e3f2fd;
+        }
+
+        .warranty-form.buy-mode h5 {
+            color: #1565c0;
+        }
+
+        .warranty-form.sell-mode {
+            background: #e8f5e9;
+        }
+
+        .warranty-form.sell-mode h5 {
+            color: #2e7d32;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header.success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .modal-header.error {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .modal-header.warning {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .modal-btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .modal-btn-success:hover {
+            background: #218838;
+        }
+
+        .modal-btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .modal-btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-btn-danger:hover {
+            background: #c82333;
+        }
+
+        /* Alert Modal Specific - Always on top */
+        .alert-modal {
+            z-index: 2000 !important;
+        }
+
+        .alert-modal .modal-dialog {
+            max-width: 400px;
+        }
+
+        .alert-modal .modal-body {
+            text-align: center;
+            padding: 30px;
+        }
+
+        .alert-modal .alert-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .alert-modal .alert-message {
+            font-size: 15px;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        /* Create Serials Modal */
+        .create-serials-form .form-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .create-serials-form .form-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .create-serials-form .section-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .create-serials-form .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+
+        .create-serials-form .form-group {
+            flex: 1;
+        }
+
+        .create-serials-form label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .create-serials-form input,
+        .create-serials-form select,
+        .create-serials-form textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .create-serials-form textarea {
+            min-height: 60px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .create-serials-form input:focus,
+        .create-serials-form select:focus,
+        .create-serials-form textarea:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn-create-serials {
+            background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+        }
+
+        .btn-create-serials:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="trades-box">
+            <header class="home-header">
+                <h1>Trades Management</h1>
+                <div class="header-actions">
+                    <a href="{{ url_for('auth.home') }}" class="btn-secondary">Back to Home</a>
+                    <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="trades-content">
+                <!-- Trades List Panel -->
+                <div class="trades-panel" style="flex: 2;">
+                    <div class="panel-header">
+                        <span>Available Trades</span>
+                        <span id="tradesCount" class="assigned-count" style="background: rgba(255,255,255,0.2);">0</span>
+                    </div>
+                    <div class="panel-body">
+                        <table class="trades-table" id="tradesTable">
+                            <thead>
+                                <tr id="tradesHeader"></tr>
+                            </thead>
+                            <tbody id="tradesBody">
+                                <tr><td colspan="10" class="loading">Loading trades...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Inventory Panel -->
+                <div class="trades-panel" style="flex: 2;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="tabs">
+                            <button class="tab active" data-tab="unassigned">Unassigned Inventory</button>
+                            <button class="tab" data-tab="assigned">Assigned to Trade</button>
+                        </div>
+                        <div class="custody-filter" style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-size: 12px; color: #fff; font-weight: 500;">Custody:</label>
+                            <select id="custodyFilter" onchange="applyCustodyFilter()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; background: #fff;">
+                                <option value="exclude">Not In Custody</option>
+                                <option value="all">All Items</option>
+                                <option value="only">In Custody Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="selection-toolbar" id="selectionToolbar" style="display: none;">
+                        <label>Filter by:</label>
+                        <select id="groupByField">
+                            <option value="">-- Choose field --</option>
+                            <option value="Vintage">Vintage</option>
+                            <option value="Registry">Registry</option>
+                            <option value="Product">Product</option>
+                            <option value="ProjectID">Project ID</option>
+                            <option value="IsCustody">Custody Status</option>
+                        </select>
+                        <select id="groupByValue" disabled>
+                            <option value="">-- Select value --</option>
+                        </select>
+                        <button class="btn-select-group" onclick="addFilterCriteria()">Add Filter</button>
+                        <button class="btn-select-group" onclick="selectByFilters()" style="background: #28a745;">Select Matching</button>
+                        <div class="filter-criteria" id="filterCriteria"></div>
+                        <button class="btn-clear" onclick="clearSelection()">Clear All</button>
+                        <span class="selection-count" id="selectionCount"></span>
+                    </div>
+                    <div class="serial-input-section" id="serialInputSection" style="display: none;">
+                        <label>Select by Serial Numbers:</label>
+                        <div class="serial-input-row">
+                            <textarea id="serialInput" placeholder="Enter serials: ABC123, DEF456 or ranges: ABC100-ABC110"></textarea>
+                            <button class="btn-select-serials" onclick="selectBySerials()">Select Serials</button>
+                        </div>
+                        <div class="serial-input-hint">Comma-separated serials or ranges (e.g., ABC100-ABC110). Use hyphen for ranges.</div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="inventory-table" id="inventoryTable">
+                            <thead>
+                                <tr id="inventoryHeader"></tr>
+                            </thead>
+                            <tbody id="inventoryBody">
+                                <tr><td colspan="10" class="loading">Select a trade to view inventory...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Assignment Panel -->
+                <div class="assignment-section">
+                    <div class="assignment-header">Assign Inventory to Trade</div>
+                    <div class="assignment-body" id="assignmentPanel">
+                        <div class="no-selection">
+                            <p>Select a trade from the list to begin assigning inventory.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allTrades = [];
+        let selectedTrade = null;
+        let unassignedInventory = [];
+        let unassignedInventoryFull = []; // Full list before custody filter
+        let assignedInventory = [];
+        let selectedSerials = new Set();
+        let currentTab = 'unassigned';
+        let filterCriteria = []; // Array of {field, value} objects
+        let actionMode = 'sell'; // 'sell' = assign existing inventory, 'buy' = create new serials
+        let custodyFilterValue = 'exclude'; // 'exclude' = Not In Custody, 'all' = All, 'only' = In Custody Only
+        const userRole = '{{ user_role }}';
+        const canWrite = ['admin', 'trader'].includes(userRole);
+
+        // Display columns for trades
+        const tradeDisplayColumns = ['trade_id', 'client', 'product_type', 'registry', 'vintage', 'quantity', 'price', 'status'];
+
+        // Display columns for inventory
+        const inventoryDisplayColumns = ['Serial', 'ProjectID', 'Product', 'Registry', 'Vintage', 'IsCustody'];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTrades();
+
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    currentTab = this.dataset.tab;
+                    selectedSerials.clear();
+                    renderInventoryTable();
+                    updateAssignmentPanel();
+                    updateGroupByOptions();
+                });
+            });
+
+            // Group by field change handler
+            document.getElementById('groupByField').addEventListener('change', function() {
+                updateGroupByOptions();
+            });
+        });
+
+        async function loadTrades() {
+            try {
+                const response = await fetch('/api/trades/get');
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                allTrades = data.data || [];
+                document.getElementById('tradesCount').textContent = allTrades.length;
+                renderTradesTable();
+            } catch (error) {
+                showError('Failed to load trades: ' + error.message);
+            }
+        }
+
+        function renderTradesTable() {
+            const headerRow = document.getElementById('tradesHeader');
+            const tbody = document.getElementById('tradesBody');
+
+            // Render headers
+            headerRow.innerHTML = tradeDisplayColumns.map(col =>
+                `<th>${formatColumnName(col)}</th>`
+            ).join('') + '<th>Assigned</th>';
+
+            // Render rows
+            if (allTrades.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="' + (tradeDisplayColumns.length + 1) + '" class="no-selection">No trades available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = allTrades.map(trade => {
+                const cells = tradeDisplayColumns.map(col => {
+                    let value = trade[col] || '';
+                    if (col === 'status') {
+                        const statusClass = 'status-' + value.toLowerCase();
+                        value = `<span class="status-badge ${statusClass}">${value}</span>`;
+                    } else if (col === 'price' || col === 'total_value') {
+                        value = typeof value === 'number' ? '$' + value.toFixed(2) : value;
+                    }
+                    return `<td title="${trade[col] || ''}">${value}</td>`;
+                }).join('');
+
+                const assignedCount = trade._assigned_count || 0;
+                const assignedBadge = assignedCount > 0
+                    ? `<span class="assigned-count">${assignedCount}</span>`
+                    : '-';
+
+                return `<tr data-trade-id="${trade.trade_id}" class="${selectedTrade?.trade_id === trade.trade_id ? 'selected' : ''}"
+                            onclick="selectTrade('${trade.trade_id}')">
+                    ${cells}
+                    <td>${assignedBadge}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function selectTrade(tradeId) {
+            selectedTrade = allTrades.find(t => t.trade_id === tradeId);
+            selectedSerials.clear();
+
+            // Update visual selection
+            document.querySelectorAll('#tradesBody tr').forEach(row => {
+                row.classList.toggle('selected', row.dataset.tradeId === tradeId);
+            });
+
+            // Load inventory for this trade
+            await loadInventory();
+            updateAssignmentPanel();
+        }
+
+        async function loadInventory() {
+            if (!selectedTrade) return;
+
+            try {
+                // Load unassigned inventory
+                const unassignedResp = await fetch('/api/trades/unassigned-inventory');
+                const unassignedData = await unassignedResp.json();
+                unassignedInventoryFull = unassignedData.data || [];
+
+                // Apply custody filter to unassigned inventory
+                unassignedInventory = applyCustodyFilterToItems(unassignedInventoryFull);
+
+                // Load assigned inventory for selected trade
+                const assignedResp = await fetch(`/api/trades/assigned-inventory/${selectedTrade.trade_id}`);
+                const assignedData = await assignedResp.json();
+                assignedInventory = assignedData.data || [];
+
+                renderInventoryTable();
+            } catch (error) {
+                showError('Failed to load inventory: ' + error.message);
+            }
+        }
+
+        // Apply custody filter to inventory items
+        function applyCustodyFilterToItems(items) {
+            if (custodyFilterValue === 'all') {
+                return items;
+            }
+
+            return items.filter(item => {
+                const isCustody = (item.IsCustody || '').toString().toLowerCase();
+                const isInCustody = isCustody === 'yes' || isCustody === 'true';
+
+                if (custodyFilterValue === 'exclude') {
+                    return !isInCustody; // Show only NOT in custody
+                } else if (custodyFilterValue === 'only') {
+                    return isInCustody; // Show only IN custody
+                }
+                return true;
+            });
+        }
+
+        // Handle custody filter change
+        function applyCustodyFilter() {
+            custodyFilterValue = document.getElementById('custodyFilter').value;
+            unassignedInventory = applyCustodyFilterToItems(unassignedInventoryFull);
+            selectedSerials.clear(); // Clear selection when filter changes
+            renderInventoryTable();
+            updateSelectionCount();
+        }
+
+        // Group inventory items by their non-Serial attributes
+        function groupInventoryItems(items) {
+            const groups = new Map();
+
+            items.forEach(item => {
+                // Create a key from all non-Serial attributes
+                const key = inventoryDisplayColumns
+                    .filter(col => col !== 'Serial')
+                    .map(col => item[col] || '')
+                    .join('|');
+
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        attributes: {},
+                        serials: []
+                    });
+                    // Copy non-Serial attributes
+                    inventoryDisplayColumns.forEach(col => {
+                        if (col !== 'Serial') {
+                            groups.get(key).attributes[col] = item[col] || '';
+                        }
+                    });
+                }
+                groups.get(key).serials.push(item.Serial);
+            });
+
+            // Split each group by continuous serial ranges
+            const result = [];
+            Array.from(groups.values()).forEach(group => {
+                const splitGroups = splitBySerialRanges(group.serials, group.attributes);
+                result.push(...splitGroups);
+            });
+
+            return result;
+        }
+
+        // Split serials into continuous ranges, creating separate groups for each range
+        function splitBySerialRanges(serials, attributes) {
+            if (serials.length === 0) return [];
+            if (serials.length === 1) {
+                return [{ attributes: attributes, serials: serials }];
+            }
+
+            // Sort serials
+            const sorted = [...serials].sort((a, b) => {
+                const pA = parseSerial(a);
+                const pB = parseSerial(b);
+                if (pA.prefix !== pB.prefix) return pA.prefix.localeCompare(pB.prefix);
+                return (pA.number || 0) - (pB.number || 0);
+            });
+
+            const groups = [];
+            let currentGroup = [sorted[0]];
+
+            for (let i = 1; i < sorted.length; i++) {
+                if (areConsecutiveSerials(sorted[i - 1], sorted[i])) {
+                    currentGroup.push(sorted[i]);
+                } else {
+                    // Start a new group
+                    groups.push({
+                        attributes: attributes,
+                        serials: currentGroup
+                    });
+                    currentGroup = [sorted[i]];
+                }
+            }
+
+            // Add the last group
+            groups.push({
+                attributes: attributes,
+                serials: currentGroup
+            });
+
+            return groups;
+        }
+
+        // Split grouped serials based on selected serials (to show user's selection as separate groups)
+        function splitGroupsBySelection(groups) {
+            if (selectedSerials.size === 0) return groups;
+
+            const result = [];
+            groups.forEach(group => {
+                const selectedInGroup = group.serials.filter(s => selectedSerials.has(s));
+                const unselectedInGroup = group.serials.filter(s => !selectedSerials.has(s));
+
+                if (selectedInGroup.length > 0 && unselectedInGroup.length > 0) {
+                    // Split selected serials by range continuity
+                    const selectedRanges = splitBySerialRanges(selectedInGroup, group.attributes);
+                    selectedRanges.forEach(g => {
+                        g.isSelected = true;
+                        result.push(g);
+                    });
+
+                    // Split unselected serials by range continuity
+                    const unselectedRanges = splitBySerialRanges(unselectedInGroup, group.attributes);
+                    unselectedRanges.forEach(g => {
+                        g.isSelected = false;
+                        result.push(g);
+                    });
+                } else {
+                    group.isSelected = selectedInGroup.length > 0;
+                    result.push(group);
+                }
+            });
+            return result;
+        }
+
+        function renderInventoryTable() {
+            const headerRow = document.getElementById('inventoryHeader');
+            const tbody = document.getElementById('inventoryBody');
+
+            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+
+            // Render headers with checkbox - change Serial to "Serial Range"
+            headerRow.innerHTML = (canWrite ? '<th class="checkbox-cell"><input type="checkbox" onchange="toggleAllSelection(this)"></th>' : '') +
+                inventoryDisplayColumns.map(col => col === 'Serial' ? '<th>Serial Range</th>' : `<th>${col}</th>`).join('') +
+                '<th>Count</th>';
+
+            // Render rows
+            if (!selectedTrade) {
+                hideSelectionToolbar();
+                tbody.innerHTML = '<tr><td colspan="' + (inventoryDisplayColumns.length + 2) + '" class="no-selection">Select a trade to view inventory</td></tr>';
+                return;
+            }
+
+            if (items.length === 0) {
+                hideSelectionToolbar();
+                const message = currentTab === 'unassigned'
+                    ? 'No unassigned inventory available'
+                    : 'No inventory assigned to this trade';
+                tbody.innerHTML = `<tr><td colspan="${inventoryDisplayColumns.length + 2}" class="no-selection">${message}</td></tr>`;
+                return;
+            }
+
+            // Show selection toolbar when items are available
+            showSelectionToolbar();
+            updateSelectionCount();
+
+            // Group items and split by selection
+            let groups = groupInventoryItems(items);
+            groups = splitGroupsBySelection(groups);
+
+            tbody.innerHTML = groups.map((group) => {
+                const serials = group.serials;
+                const count = serials.length;
+
+                // Since groups are now split by range continuity, display as single range
+                let serialDisplay;
+                if (count === 1) {
+                    serialDisplay = serials[0];
+                } else {
+                    // Sort and show first - last
+                    const sorted = [...serials].sort((a, b) => {
+                        const pA = parseSerial(a);
+                        const pB = parseSerial(b);
+                        if (pA.prefix !== pB.prefix) return pA.prefix.localeCompare(pB.prefix);
+                        return (pA.number || 0) - (pB.number || 0);
+                    });
+                    serialDisplay = `${sorted[0]} - ${sorted[sorted.length - 1]}`;
+                }
+
+                // Check if all serials in this group are selected
+                const allSelected = serials.every(s => selectedSerials.has(s));
+                const someSelected = serials.some(s => selectedSerials.has(s));
+
+                // Store serials as data attribute for group selection
+                const serialsData = serials.join(',');
+
+                const checkbox = canWrite
+                    ? `<td class="checkbox-cell"><input type="checkbox" ${allSelected ? 'checked' : ''} ${someSelected && !allSelected ? 'indeterminate' : ''} onchange="toggleGroupSelection('${serialsData}', this.checked)"></td>`
+                    : '';
+
+                const cells = inventoryDisplayColumns.map(col => {
+                    if (col === 'Serial') {
+                        return `<td title="${serialDisplay}" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${serialDisplay}</td>`;
+                    }
+                    return `<td title="${group.attributes[col] || ''}">${group.attributes[col] || ''}</td>`;
+                }).join('');
+
+                const rowClass = allSelected ? 'selected-row' : '';
+                return `<tr class="${rowClass}">${checkbox}${cells}<td style="text-align: center; font-weight: 600;">${count}</td></tr>`;
+            }).join('');
+
+            // Set indeterminate state for partially selected groups
+            document.querySelectorAll('#inventoryBody input[type="checkbox"]').forEach(cb => {
+                const serialsData = cb.getAttribute('onchange')?.match(/'([^']+)'/)?.[1];
+                if (serialsData) {
+                    const serials = serialsData.split(',');
+                    const someSelected = serials.some(s => selectedSerials.has(s));
+                    const allSelected = serials.every(s => selectedSerials.has(s));
+                    if (someSelected && !allSelected) {
+                        cb.indeterminate = true;
+                    }
+                }
+            });
+        }
+
+        // Toggle selection for a group of serials
+        function toggleGroupSelection(serialsData, checked) {
+            const serials = serialsData.split(',');
+            serials.forEach(serial => {
+                if (checked) {
+                    selectedSerials.add(serial);
+                } else {
+                    selectedSerials.delete(serial);
+                }
+            });
+            updateSelectionCount();
+            renderInventoryTable(); // Re-render to update grouping based on selection
+        }
+
+        function toggleSelection(serial, checked) {
+            if (checked) {
+                selectedSerials.add(serial);
+            } else {
+                selectedSerials.delete(serial);
+            }
+            updateAssignmentPanel();
+            updateSelectionCount();
+        }
+
+        function toggleAllSelection(checkbox) {
+            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            selectedSerials.clear();
+
+            if (checkbox.checked) {
+                items.forEach(item => selectedSerials.add(item.Serial));
+            }
+
+            renderInventoryTable();
+            updateAssignmentPanel();
+            updateSelectionCount();
+        }
+
+        function setActionMode(mode) {
+            actionMode = mode;
+            updateAssignmentPanel();
+        }
+
+        function updateAssignmentPanel() {
+            const panel = document.getElementById('assignmentPanel');
+
+            if (!selectedTrade) {
+                panel.innerHTML = '<div class="no-selection"><p>Select a trade from the list to begin assigning inventory.</p></div>';
+                return;
+            }
+
+            const trade = selectedTrade;
+            const selectedCount = selectedSerials.size;
+            const isUnassignedTab = currentTab === 'unassigned';
+
+            const tradeQuantity = trade.quantity || 0;
+            const alreadyAssigned = trade._assigned_count || 0;
+            const remainingQuantity = tradeQuantity - alreadyAssigned;
+            const isFullyAllocated = remainingQuantity <= 0;
+
+            let html = `
+                <div class="trade-details">
+                    <h4>Trade: ${trade.trade_id}</h4>
+                    <p>Client: <span class="value">${trade.client || 'N/A'}</span></p>
+                    <p>Counterparty: <span class="value">${trade.counterparty || 'N/A'}</span></p>
+                    <p>Quantity: <span class="value">${tradeQuantity}</span></p>
+                    <p>Status: <span class="value">${trade.status || 'N/A'}</span></p>
+                    <p>Currently Assigned: <span class="value">${alreadyAssigned}</span></p>
+                    <p style="font-weight: 600; color: ${isFullyAllocated ? '#28a745' : '#dc3545'};">
+                        Remaining: <span class="value">${remainingQuantity}</span>
+                        ${isFullyAllocated ? ' ✓ Fully Allocated' : ''}
+                    </p>
+                </div>
+            `;
+
+            // Show mode toggle only for unassigned tab with write access
+            if (isUnassignedTab && canWrite) {
+                html += `
+                    <div class="mode-toggle">
+                        <button class="mode-btn sell-mode ${actionMode === 'sell' ? 'active' : ''}" onclick="setActionMode('sell')">
+                            Assign Inventory (Sell)
+                        </button>
+                        <button class="mode-btn buy-mode ${actionMode === 'buy' ? 'active' : ''}" onclick="setActionMode('buy')">
+                            Create Serials (Buy)
+                        </button>
+                    </div>
+                `;
+
+                if (actionMode === 'sell') {
+                    // Sell mode - show SELL warranty fields only
+                    html += `
+                        <div class="warranty-form sell-mode">
+                            <h5>Sell Warranty Dates</h5>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Sell Client</label>
+                                    <input type="text" id="sellClient" value="${trade.client || ''}" placeholder="Client name">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Sell Warranty Start</label>
+                                    <input type="date" id="sellStart">
+                                </div>
+                                <div class="form-group">
+                                    <label>Sell Warranty End</label>
+                                    <input type="date" id="sellEnd">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Show selected items for sell mode
+                    if (selectedCount > 0) {
+                        const serialArray = Array.from(selectedSerials);
+                        const ranges = groupSerialsIntoRanges(serialArray);
+                        const displayRanges = ranges.slice(0, 15);
+                        const moreRanges = ranges.length - 15;
+
+                        html += `
+                            <div class="selected-items">
+                                <h5>Selected Items (${selectedCount} serial${selectedCount !== 1 ? 's' : ''} in ${ranges.length} group${ranges.length !== 1 ? 's' : ''})</h5>
+                                <div class="selected-ranges">
+                                    ${displayRanges.map(r => `<span class="selected-range-item">${r}</span>`).join('')}
+                                    ${moreRanges > 0 ? `<span class="selected-range-item" style="background: #fff3cd;">+ ${moreRanges} more groups</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const canAssign = selectedCount > 0 && selectedCount <= remainingQuantity && !isFullyAllocated;
+                    html += `
+                        <button class="btn-assign" onclick="assignSelected()" ${!canAssign ? 'disabled' : ''}>
+                            Assign ${selectedCount} Item${selectedCount !== 1 ? 's' : ''} to Trade (Sell)
+                        </button>
+                    `;
+                    if (selectedCount > remainingQuantity && remainingQuantity > 0) {
+                        html += `<p style="color: #dc3545; font-size: 12px; margin-top: 8px; text-align: center;">
+                            Selection exceeds remaining quantity (${remainingQuantity})
+                        </p>`;
+                    }
+                    if (isFullyAllocated) {
+                        html += `<p style="color: #28a745; font-size: 12px; margin-top: 8px; text-align: center;">
+                            Trade is fully allocated
+                        </p>`;
+                    }
+                } else {
+                    // Buy mode - prompt to create serials via modal
+                    html += `
+                        <div class="warranty-form buy-mode">
+                            <h5>Create New Serials</h5>
+                            <p style="font-size: 13px; color: #555; margin: 10px 0;">
+                                Use this when buying inventory from a counterparty.
+                                New serials will be created and assigned to this trade with BUY warranty information.
+                            </p>
+                            ${!isFullyAllocated ? `<p style="font-size: 13px; color: #1565c0; font-weight: 600;">
+                                Required: ${remainingQuantity} serial(s)
+                            </p>` : ''}
+                        </div>
+                        <button class="btn-assign btn-create-serials" onclick="openCreateSerialsModal()" ${isFullyAllocated ? 'disabled' : ''}>
+                            ${isFullyAllocated ? 'Trade Fully Allocated' : `Create ${remainingQuantity} New Serial${remainingQuantity !== 1 ? 's' : ''} for Trade`}
+                        </button>
+                    `;
+                }
+            } else if (!isUnassignedTab && canWrite) {
+                // Assigned tab - show unassign button
+                if (selectedCount > 0) {
+                    const serialArray = Array.from(selectedSerials);
+                    const ranges = groupSerialsIntoRanges(serialArray);
+                    const displayRanges = ranges.slice(0, 15);
+                    const moreRanges = ranges.length - 15;
+
+                    html += `
+                        <div class="selected-items">
+                            <h5>Selected Items (${selectedCount} serial${selectedCount !== 1 ? 's' : ''} in ${ranges.length} group${ranges.length !== 1 ? 's' : ''})</h5>
+                            <div class="selected-ranges">
+                                ${displayRanges.map(r => `<span class="selected-range-item">${r}</span>`).join('')}
+                                ${moreRanges > 0 ? `<span class="selected-range-item" style="background: #fff3cd;">+ ${moreRanges} more groups</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <button class="btn-assign btn-unassign" onclick="unassignSelected()" ${selectedCount === 0 ? 'disabled' : ''}>
+                        Unassign ${selectedCount} Item${selectedCount !== 1 ? 's' : ''}
+                    </button>
+                `;
+            } else if (!canWrite) {
+                html += '<p style="color: #666; text-align: center; margin-top: 20px;">Read-only mode - cannot modify assignments</p>';
+            }
+
+            panel.innerHTML = html;
+        }
+
+        async function assignSelected() {
+            if (!selectedTrade || selectedSerials.size === 0) return;
+
+            // Validate that assignment doesn't exceed trade quantity
+            const tradeQuantity = selectedTrade.quantity || 0;
+            const alreadyAssigned = selectedTrade._assigned_count || 0;
+            const remainingQuantity = tradeQuantity - alreadyAssigned;
+            const selectedCount = selectedSerials.size;
+
+            if (selectedCount > remainingQuantity) {
+                showWarning(`Cannot assign ${selectedCount} item(s). Only ${remainingQuantity} remaining for this trade (${tradeQuantity} total, ${alreadyAssigned} already assigned).`);
+                return;
+            }
+
+            // Sell mode - only send SELL warranty data
+            const payload = {
+                trade_id: selectedTrade.trade_id,
+                serials: Array.from(selectedSerials),
+                sell_warranty_start: document.getElementById('sellStart')?.value || null,
+                sell_warranty_end: document.getElementById('sellEnd')?.value || null,
+                sell_client: document.getElementById('sellClient')?.value || null,
+                set_sell_tradeid: true,
+                set_buy_tradeid: false
+            };
+
+            try {
+                const response = await fetch('/api/trades/bulk-assign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(`Successfully assigned ${result.assigned_count} item(s) to trade ${selectedTrade.trade_id}`);
+                    selectedSerials.clear();
+                    await loadTrades();
+                    await loadInventory();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to assign items');
+                }
+            } catch (error) {
+                showError('Failed to assign items: ' + error.message);
+            }
+        }
+
+        async function unassignSelected() {
+            if (selectedSerials.size === 0) return;
+
+            try {
+                const response = await fetch('/api/trades/unassign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serials: Array.from(selectedSerials) })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(`Successfully unassigned ${result.unassigned_count} item(s)`);
+                    selectedSerials.clear();
+                    await loadTrades();
+                    await loadInventory();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to unassign items');
+                }
+            } catch (error) {
+                showError('Failed to unassign items: ' + error.message);
+            }
+        }
+
+        function updateGroupByOptions() {
+            const field = document.getElementById('groupByField').value;
+            const valueSelect = document.getElementById('groupByValue');
+            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+
+            if (!field || items.length === 0) {
+                valueSelect.innerHTML = '<option value="">-- Select value --</option>';
+                valueSelect.disabled = true;
+                return;
+            }
+
+            // Get unique values for the selected field
+            const uniqueValues = [...new Set(items.map(item => item[field] || '(empty)'))].sort();
+
+            valueSelect.innerHTML = '<option value="">-- Select value --</option>' +
+                uniqueValues.map(val => `<option value="${val}">${val} (${items.filter(i => (i[field] || '(empty)') === val).length})</option>`).join('');
+            valueSelect.disabled = false;
+        }
+
+        function addFilterCriteria() {
+            const field = document.getElementById('groupByField').value;
+            const value = document.getElementById('groupByValue').value;
+
+            if (!field || !value) {
+                showWarning('Please select a field and value');
+                return;
+            }
+
+            // Check if this criteria already exists
+            const exists = filterCriteria.some(c => c.field === field && c.value === value);
+            if (exists) {
+                showInfo('This filter is already added');
+                return;
+            }
+
+            filterCriteria.push({ field, value });
+            renderFilterTags();
+
+            // Reset dropdowns
+            document.getElementById('groupByField').value = '';
+            document.getElementById('groupByValue').innerHTML = '<option value="">-- Select value --</option>';
+            document.getElementById('groupByValue').disabled = true;
+        }
+
+        function removeFilterCriteria(index) {
+            filterCriteria.splice(index, 1);
+            renderFilterTags();
+        }
+
+        function renderFilterTags() {
+            const container = document.getElementById('filterCriteria');
+            if (filterCriteria.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = filterCriteria.map((c, i) =>
+                `<span class="filter-tag">${c.field}: ${c.value}<span class="remove-filter" onclick="removeFilterCriteria(${i})">×</span></span>`
+            ).join('');
+        }
+
+        function selectByFilters() {
+            if (filterCriteria.length === 0) {
+                showWarning('Please add at least one filter criteria');
+                return;
+            }
+
+            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+
+            // Find items matching ALL criteria (AND logic)
+            const matchingItems = items.filter(item => {
+                return filterCriteria.every(criteria => {
+                    const itemValue = item[criteria.field] || '(empty)';
+                    return itemValue === criteria.value;
+                });
+            });
+
+            if (matchingItems.length === 0) {
+                showWarning('No items match all the selected criteria');
+                return;
+            }
+
+            // Add matching serials to selection
+            matchingItems.forEach(item => selectedSerials.add(item.Serial));
+
+            renderInventoryTable();
+            updateAssignmentPanel();
+            updateSelectionCount();
+        }
+
+        // Parse serial input - handles comma-separated serials and ranges
+        function parseSerialInput(input) {
+            const parts = input.split(',').map(p => p.trim()).filter(p => p);
+            const serials = [];
+
+            parts.forEach(part => {
+                if (part.includes('-')) {
+                    // Could be a range: ABC100-ABC110 or ABC100-110
+                    const hyphenIndex = part.lastIndexOf('-');
+                    if (hyphenIndex > 0) {
+                        const start = part.substring(0, hyphenIndex).trim();
+                        const end = part.substring(hyphenIndex + 1).trim();
+                        const range = expandSerialRange(start, end);
+                        serials.push(...range);
+                    } else {
+                        serials.push(part);
+                    }
+                } else {
+                    serials.push(part);
+                }
+            });
+
+            return [...new Set(serials)];
+        }
+
+        // Expand a serial range like ABC100-ABC110 or ABC100-110
+        function expandSerialRange(start, end) {
+            const startMatch = start.match(/^(.*?)(\d+)$/);
+            const endMatch = end.match(/^(.*?)(\d+)$/);
+
+            if (!startMatch) {
+                return [start, end];
+            }
+
+            const startPrefix = startMatch[1];
+            const startNum = parseInt(startMatch[2]);
+            const numLength = startMatch[2].length;
+
+            let endNum;
+            if (endMatch && endMatch[1]) {
+                // Full end serial with prefix
+                endNum = parseInt(endMatch[2]);
+            } else {
+                // Just a number (e.g., ABC100-110)
+                endNum = parseInt(end);
+            }
+
+            if (isNaN(endNum) || endNum < startNum) {
+                return [start];
+            }
+
+            const serials = [];
+            for (let num = startNum; num <= endNum; num++) {
+                // Preserve leading zeros
+                const paddedNum = String(num).padStart(numLength, '0');
+                serials.push(startPrefix + paddedNum);
+            }
+
+            return serials;
+        }
+
+        // Required serial count for the Create Serials modal
+        let requiredSerialCount = 0;
+
+        // Update the live serial counter in Create Serials modal
+        function updateSerialCounter() {
+            const input = document.getElementById('newSerialInput').value.trim();
+            const counterEl = document.getElementById('serialCounter');
+
+            let count = 0;
+            if (input) {
+                const serials = parseSerialInput(input);
+                count = serials.length;
+            }
+
+            // Color code: green if exact match, red if over/under, blue if still typing
+            let color = '#667eea'; // Default blue
+            if (count === requiredSerialCount && requiredSerialCount > 0) {
+                color = '#27ae60'; // Green - exact match
+            } else if (count > requiredSerialCount || (count > 0 && count < requiredSerialCount)) {
+                color = '#e74c3c'; // Red - mismatch
+            }
+
+            counterEl.textContent = `${count} / ${requiredSerialCount} serials`;
+            counterEl.style.color = color;
+        }
+
+        function selectBySerials() {
+            const input = document.getElementById('serialInput').value.trim();
+
+            if (!input) {
+                showWarning('Please enter serial numbers or ranges');
+                return;
+            }
+
+            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            const requestedSerials = parseSerialInput(input);
+            const availableSerials = new Set(items.map(i => i.Serial));
+
+            let matchCount = 0;
+            requestedSerials.forEach(serial => {
+                if (availableSerials.has(serial)) {
+                    selectedSerials.add(serial);
+                    matchCount++;
+                }
+            });
+
+            if (matchCount === 0) {
+                showWarning(`No matching serials found in ${currentTab} inventory`);
+            } else if (matchCount < requestedSerials.length) {
+                showInfo(`Selected ${matchCount} of ${requestedSerials.length} serials (some not found in ${currentTab} inventory)`);
+            }
+
+            document.getElementById('serialInput').value = '';
+            renderInventoryTable();
+            updateAssignmentPanel();
+            updateSelectionCount();
+        }
+
+        function clearSelection() {
+            selectedSerials.clear();
+            filterCriteria = [];
+            document.getElementById('groupByField').value = '';
+            document.getElementById('groupByValue').innerHTML = '<option value="">-- Select value --</option>';
+            document.getElementById('groupByValue').disabled = true;
+            document.getElementById('serialInput').value = '';
+            renderFilterTags();
+            renderInventoryTable();
+            updateAssignmentPanel();
+            updateSelectionCount();
+        }
+
+        function updateSelectionCount() {
+            const countEl = document.getElementById('selectionCount');
+            if (selectedSerials.size > 0) {
+                countEl.textContent = `${selectedSerials.size} selected`;
+            } else {
+                countEl.textContent = '';
+            }
+        }
+
+        function showSelectionToolbar() {
+            const toolbar = document.getElementById('selectionToolbar');
+            const serialSection = document.getElementById('serialInputSection');
+            if (canWrite) {
+                if (toolbar) toolbar.style.display = 'flex';
+                if (serialSection) serialSection.style.display = 'block';
+                updateGroupByOptions();
+            }
+        }
+
+        function hideSelectionToolbar() {
+            const toolbar = document.getElementById('selectionToolbar');
+            const serialSection = document.getElementById('serialInputSection');
+            if (toolbar) toolbar.style.display = 'none';
+            if (serialSection) serialSection.style.display = 'none';
+        }
+
+        // Parse serial to extract prefix and number for grouping
+        function parseSerial(serial) {
+            if (!serial) return null;
+            const str = serial.toString().trim();
+            const match = str.match(/^(.*?)(\d+)$/);
+            if (match) {
+                return {
+                    prefix: match[1],
+                    number: parseInt(match[2]),
+                    numLength: match[2].length,
+                    original: str
+                };
+            }
+            return { prefix: str, number: null, numLength: 0, original: str };
+        }
+
+        // Check if two serials are consecutive
+        function areConsecutiveSerials(serial1, serial2) {
+            const s1 = parseSerial(serial1);
+            const s2 = parseSerial(serial2);
+            if (!s1 || !s2 || s1.number === null || s2.number === null) return false;
+            return s1.prefix === s2.prefix && s2.number === s1.number + 1;
+        }
+
+        // Group serials into ranges for display
+        function groupSerialsIntoRanges(serials) {
+            if (serials.length === 0) return [];
+            if (serials.length === 1) return [serials[0]];
+
+            // Sort serials
+            const sorted = [...serials].sort((a, b) => {
+                const pA = parseSerial(a);
+                const pB = parseSerial(b);
+                if (pA.prefix !== pB.prefix) return pA.prefix.localeCompare(pB.prefix);
+                return (pA.number || 0) - (pB.number || 0);
+            });
+
+            const ranges = [];
+            let rangeStart = sorted[0];
+            let rangeEnd = sorted[0];
+
+            for (let i = 1; i < sorted.length; i++) {
+                if (areConsecutiveSerials(rangeEnd, sorted[i])) {
+                    rangeEnd = sorted[i];
+                } else {
+                    // Save current range
+                    if (rangeStart === rangeEnd) {
+                        ranges.push(rangeStart);
+                    } else {
+                        ranges.push(`${rangeStart} - ${rangeEnd}`);
+                    }
+                    rangeStart = sorted[i];
+                    rangeEnd = sorted[i];
+                }
+            }
+
+            // Save last range
+            if (rangeStart === rangeEnd) {
+                ranges.push(rangeStart);
+            } else {
+                ranges.push(`${rangeStart} - ${rangeEnd}`);
+            }
+
+            return ranges;
+        }
+
+        function formatColumnName(col) {
+            return col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function showError(message) {
+            showModal('error', 'Error', message);
+        }
+
+        function showSuccess(message) {
+            showModal('success', 'Success', message);
+        }
+
+        function showWarning(message) {
+            showModal('warning', 'Warning', message);
+        }
+
+        function showInfo(message) {
+            showModal('info', 'Information', message);
+        }
+
+        function showModal(type, title, message, callback) {
+            const overlay = document.getElementById('alertModal');
+            const header = overlay.querySelector('.modal-header');
+            const titleEl = overlay.querySelector('.modal-title');
+            const messageEl = overlay.querySelector('.alert-message');
+            const iconEl = overlay.querySelector('.alert-icon');
+
+            // Set header class based on type
+            header.className = 'modal-header ' + type;
+
+            // Set icon based on type
+            const icons = {
+                success: '✓',
+                error: '✕',
+                warning: '⚠',
+                info: 'ℹ'
+            };
+            iconEl.textContent = icons[type] || 'ℹ';
+            iconEl.style.color = type === 'error' ? '#dc3545' :
+                                 type === 'success' ? '#28a745' :
+                                 type === 'warning' ? '#ffc107' : '#667eea';
+
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+
+            overlay.classList.add('active');
+            overlay._callback = callback;
+        }
+
+        function closeAlertModal() {
+            const overlay = document.getElementById('alertModal');
+            overlay.classList.remove('active');
+            if (overlay._callback) {
+                overlay._callback();
+                overlay._callback = null;
+            }
+        }
+
+        function openCreateSerialsModal() {
+            if (!selectedTrade) {
+                showWarning('Please select a trade first');
+                return;
+            }
+
+            const trade = selectedTrade;
+            const tradeQuantity = trade.quantity || 0;
+            const alreadyAssigned = trade._assigned_count || 0;
+            const remainingQuantity = tradeQuantity - alreadyAssigned;
+
+            if (remainingQuantity <= 0) {
+                showInfo('This trade is fully allocated. No more serials can be created.');
+                return;
+            }
+
+            const modal = document.getElementById('createSerialsModal');
+
+            // Get today's date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+
+            // Pre-fill trade info
+            document.getElementById('newSerialTradeId').value = trade.trade_id;
+            document.getElementById('newSerialBuyClient').value = trade.client || '';  // Default to Client name
+            document.getElementById('newSerialBuyStart').value = trade.buy_warranty_start || '';  // Keep empty by default
+            document.getElementById('newSerialBuyEnd').value = trade.buy_warranty_end || '';  // Keep empty by default
+
+            // Clear/set other fields
+            document.getElementById('newSerialInput').value = '';
+            document.getElementById('newSerialInput').placeholder = `Enter exactly ${remainingQuantity} serial(s) - e.g., ABC100-ABC${99 + remainingQuantity}`;
+            document.getElementById('newSerialMarket').value = '';
+            document.getElementById('newSerialRegistry').value = trade.registry || '';
+            document.getElementById('newSerialProduct').value = trade.product_type || '';
+            document.getElementById('newSerialProjectId').value = trade.project_id || '';
+            document.getElementById('newSerialProjectType').value = trade.project_type || '';
+            document.getElementById('newSerialProtocol').value = trade.protocol || '';
+            document.getElementById('newSerialProjectName').value = trade.project_name || '';
+            document.getElementById('newSerialVintage').value = trade.vintage || '';
+            document.getElementById('newSerialCustody').value = 'False';  // Default to False
+
+            // Update the required quantity display
+            document.getElementById('requiredQuantityDisplay').textContent =
+                `Required: ${remainingQuantity} serial(s) (Trade qty: ${tradeQuantity}, Already assigned: ${alreadyAssigned})`;
+
+            // Initialize the live counter
+            requiredSerialCount = remainingQuantity;
+            updateSerialCounter();
+
+            modal.classList.add('active');
+        }
+
+        function closeCreateSerialsModal() {
+            document.getElementById('createSerialsModal').classList.remove('active');
+        }
+
+        async function submitCreateSerials() {
+            const serialInput = document.getElementById('newSerialInput').value.trim();
+
+            if (!serialInput) {
+                showWarning('Please enter serial numbers or ranges');
+                return;
+            }
+
+            const serials = parseSerialInput(serialInput);
+
+            if (serials.length === 0) {
+                showWarning('No valid serials found');
+                return;
+            }
+
+            // Validate that serial count matches trade quantity
+            const tradeQuantity = selectedTrade.quantity || 0;
+            const alreadyAssigned = selectedTrade._assigned_count || 0;
+            const remainingQuantity = tradeQuantity - alreadyAssigned;
+
+            if (serials.length !== remainingQuantity) {
+                showWarning(`Serial count (${serials.length}) must match the remaining trade quantity (${remainingQuantity}). Trade requires ${tradeQuantity} total, ${alreadyAssigned} already assigned.`);
+                return;
+            }
+
+            const payload = {
+                serials: serials,
+                trade_id: document.getElementById('newSerialTradeId').value,
+                market: document.getElementById('newSerialMarket').value,
+                registry: document.getElementById('newSerialRegistry').value,
+                product: document.getElementById('newSerialProduct').value,
+                project_id: document.getElementById('newSerialProjectId').value,
+                project_type: document.getElementById('newSerialProjectType').value,
+                protocol: document.getElementById('newSerialProtocol').value,
+                project_name: document.getElementById('newSerialProjectName').value,
+                vintage: document.getElementById('newSerialVintage').value,
+                is_custody: document.getElementById('newSerialCustody').value,
+                buy_client: document.getElementById('newSerialBuyClient').value,
+                buy_start: document.getElementById('newSerialBuyStart').value,
+                buy_end: document.getElementById('newSerialBuyEnd').value
+            };
+
+            try {
+                const response = await fetch('/api/trades/create-serials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeCreateSerialsModal();
+                    showSuccess(`Successfully created ${result.created_count} serial(s) and assigned to trade ${selectedTrade.trade_id}`);
+                    await loadTrades();
+                    await loadInventory();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to create serials');
+                }
+            } catch (error) {
+                showError('Failed to create serials: ' + error.message);
+            }
+        }
+    </script>
+
+    <!-- Alert Modal -->
+    <div class="modal-overlay alert-modal" id="alertModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Alert</span>
+                <button class="modal-close" onclick="closeAlertModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert-icon">ℹ</div>
+                <div class="alert-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-primary" onclick="closeAlertModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Serials Modal -->
+    <div class="modal-overlay" id="createSerialsModal">
+        <div class="modal-dialog" style="max-width: 650px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);">
+                <span class="modal-title">Create New Serials (Buy from Counterparty)</span>
+                <button class="modal-close" onclick="closeCreateSerialsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="create-serials-form">
+                    <div class="form-section">
+                        <div class="section-title">Serial Numbers</div>
+                        <div id="requiredQuantityDisplay" style="background: #e3f2fd; color: #1565c0; padding: 10px; border-radius: 4px; margin-bottom: 10px; font-weight: 600; font-size: 13px;">
+                            Required: 0 serial(s)
+                        </div>
+                        <div class="form-group">
+                            <label>Serials / Ranges *</label>
+                            <textarea id="newSerialInput" placeholder="Enter serials: ABC123, DEF456 or ranges: ABC100-ABC110" oninput="updateSerialCounter()"></textarea>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                <div style="font-size: 11px; color: #888;">Comma-separated serials or ranges (e.g., ABC100-ABC110)</div>
+                                <div id="serialCounter" style="font-size: 12px; font-weight: 600; color: #667eea;">0 / 0 serials</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title">Inventory Metadata</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Market</label>
+                                <input type="text" id="newSerialMarket" placeholder="e.g., VCM">
+                            </div>
+                            <div class="form-group">
+                                <label>Registry</label>
+                                <input type="text" id="newSerialRegistry" placeholder="e.g., Verra">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Product</label>
+                                <input type="text" id="newSerialProduct" placeholder="e.g., VCU">
+                            </div>
+                            <div class="form-group">
+                                <label>Project ID</label>
+                                <input type="text" id="newSerialProjectId" placeholder="e.g., VCS-1234">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Project Type</label>
+                                <input type="text" id="newSerialProjectType" placeholder="e.g., ARR">
+                            </div>
+                            <div class="form-group">
+                                <label>Protocol</label>
+                                <input type="text" id="newSerialProtocol" placeholder="e.g., VM0007">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2;">
+                                <label>Project Name</label>
+                                <input type="text" id="newSerialProjectName" placeholder="e.g., Amazon Rainforest Conservation">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Vintage</label>
+                                <input type="text" id="newSerialVintage" placeholder="e.g., 2023">
+                            </div>
+                            <div class="form-group">
+                                <label>In Custody</label>
+                                <select id="newSerialCustody">
+                                    <option value="False">False</option>
+                                    <option value="True">True</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title">Buy Warranty Information</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Trade ID (Auto)</label>
+                                <input type="text" id="newSerialTradeId" readonly style="background: #f0f0f0;">
+                            </div>
+                            <div class="form-group">
+                                <label>Buy Client (Counterparty)</label>
+                                <input type="text" id="newSerialBuyClient" placeholder="Counterparty name">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Buy Warranty Start</label>
+                                <input type="date" id="newSerialBuyStart">
+                            </div>
+                            <div class="form-group">
+                                <label>Buy Warranty End</label>
+                                <input type="date" id="newSerialBuyEnd">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeCreateSerialsModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="submitCreateSerials()" style="background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);">Create Serials</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
