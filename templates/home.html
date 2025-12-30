@@ -11,7 +11,7 @@
         <div class="home-box">
             <header class="home-header">
                 <h1>Welcome to Carbon IMS</h1>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
             </header>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -30,21 +30,21 @@
             </div>
 
             <div class="dashboard-grid">
-                <a href="{{ url_for('dashboard') }}" style="text-decoration: none;">
+                <a href="{{ url_for('dashboard.dashboard') }}" style="text-decoration: none;">
                     <div class="dashboard-card">
                         <h3>Dashboard</h3>
                         <p>View your system overview and analytics</p>
                     </div>
                 </a>
 
-                <a href="{{ url_for('inventory') }}" style="text-decoration: none;">
+                <a href="{{ url_for('inventory.inventory') }}" style="text-decoration: none;">
                     <div class="dashboard-card">
                         <h3>Manage Inventory</h3>
                         <p>Manage portfolio of environmental assets</p>
                     </div>
                 </a>
 
-                <a href="{{ url_for('warranties') }}" style="text-decoration: none;">
+                <a href="{{ url_for('warranties.warranties') }}" style="text-decoration: none;">
                     <div class="dashboard-card">
                         <h3>Warranties</h3>
                         <p>Manage warranty information and dates</p>
@@ -52,7 +52,7 @@
                 </a>
 
                 {# Registry Data page hidden - not fully developed yet
-                <a href="{{ url_for('registry_data') }}" style="text-decoration: none;">
+                <a href="{{ url_for('registry.registry_data') }}" style="text-decoration: none;">
                     <div class="dashboard-card">
                         <h3>Registry Data</h3>
                         <p>Query carbon credit registries (Verra, Gold Standard, ACR, CAR)</p>
@@ -61,7 +61,7 @@
                 #}
 
                 {% if user_role == 'admin' %}
-                <a href="{{ url_for('manage_users') }}" style="text-decoration: none;">
+                <a href="{{ url_for('users.manage_users') }}" style="text-decoration: none;">
                     <div class="dashboard-card">
                         <h3>User Management</h3>
                         <p>Manage user access and permissions</p>
@@ -69,7 +69,7 @@
                 </a>
                 {% endif %}
 
-                <a href="{{ url_for('settings') }}" style="text-decoration: none;">
+                <a href="{{ url_for('settings.settings') }}" style="text-decoration: none;">
                     <div class="dashboard-card">
                         <h3>Settings</h3>
                         <p>Configure your account and preferences</p>

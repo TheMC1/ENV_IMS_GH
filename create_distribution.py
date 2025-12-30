@@ -48,7 +48,8 @@ def create_distribution():
     # Directories to include
     include_dirs = [
         'static',
-        'templates'
+        'templates',
+        'routes'
     ]
 
     def should_exclude(path):
@@ -107,17 +108,18 @@ def create_distribution():
     print(f"Size: {size_mb:.2f} MB ({size_kb:.2f} KB)")
     print()
     print("Package Contents:")
-    print("  • Core application files")
-    print("  • All templates and static files")
-    print("  • Setup and start scripts (Windows & Mac/Linux)")
-    print("  • Complete documentation")
+    print("  - Core application files (app.py, database.py)")
+    print("  - Route modules (routes/)")
+    print("  - All templates and static files")
+    print("  - Setup and start scripts (Windows & Mac/Linux)")
+    print("  - Complete documentation")
     print()
     print("Excluded from package:")
-    print("  • Virtual environment (.venv)")
-    print("  • Database files (*.db)")
-    print("  • Python cache (__pycache__)")
-    print("  • IDE settings (.idea, .claude)")
-    print("  • Archive folder")
+    print("  - Virtual environment (.venv)")
+    print("  - Database files (*.db)")
+    print("  - Python cache (__pycache__)")
+    print("  - IDE settings (.idea, .claude)")
+    print("  - Archive folder")
     print()
     print("Ready for distribution!")
     print()

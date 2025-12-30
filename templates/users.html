@@ -12,8 +12,8 @@
             <header class="home-header">
                 <h1>User Management</h1>
                 <div class="header-actions">
-                    <a href="{{ url_for('home') }}" class="btn-secondary">Back to Home</a>
-                    <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+                    <a href="{{ url_for('auth.home') }}" class="btn-secondary">Back to Home</a>
+                    <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
                 </div>
             </header>
 
@@ -34,7 +34,7 @@
                 </div>
 
                 <div id="addUserForm" class="form-card" style="display: none;">
-                    <form method="POST" action="{{ url_for('add_user') }}">
+                    <form method="POST" action="{{ url_for('users.add_user') }}">
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="add-username">Username *</label>
@@ -142,7 +142,7 @@
                 <h3>Edit User</h3>
                 <span class="close" onclick="closeEditModal()">&times;</span>
             </div>
-            <form method="POST" action="{{ url_for('edit_user') }}">
+            <form method="POST" action="{{ url_for('users.edit_user') }}">
                 <input type="hidden" id="edit-old-username" name="old_username">
                 <div class="form-group">
                     <label for="edit-username">Username</label>
@@ -192,7 +192,7 @@
                 <h3>Reset Password</h3>
                 <span class="close" onclick="closeResetPasswordModal()">&times;</span>
             </div>
-            <form method="POST" action="{{ url_for('reset_password') }}">
+            <form method="POST" action="{{ url_for('users.reset_password') }}">
                 <input type="hidden" id="reset-username" name="username">
                 <p>Resetting password for: <strong id="reset-username-display"></strong></p>
                 <div class="form-group">
@@ -214,7 +214,7 @@
                 <h3>Delete User</h3>
                 <span class="close" onclick="closeDeleteModal()">&times;</span>
             </div>
-            <form method="POST" action="{{ url_for('delete_user') }}">
+            <form method="POST" action="{{ url_for('users.delete_user') }}">
                 <input type="hidden" id="delete-username" name="username">
                 <p>Are you sure you want to delete user: <strong id="delete-username-display"></strong>?</p>
                 <p class="warning-text">This action cannot be undone.</p>
@@ -233,7 +233,7 @@
                 <h3>Suspend User</h3>
                 <span class="close" onclick="closeSuspendModal()">&times;</span>
             </div>
-            <form method="POST" action="{{ url_for('suspend_user') }}">
+            <form method="POST" action="{{ url_for('users.suspend_user') }}">
                 <input type="hidden" id="suspend-username" name="username">
                 <p>Are you sure you want to suspend user: <strong id="suspend-username-display"></strong>?</p>
                 <p class="warning-text">This user will not be able to log in until unsuspended.</p>
@@ -252,7 +252,7 @@
                 <h3>Unsuspend User</h3>
                 <span class="close" onclick="closeUnsuspendModal()">&times;</span>
             </div>
-            <form method="POST" action="{{ url_for('unsuspend_user') }}">
+            <form method="POST" action="{{ url_for('users.unsuspend_user') }}">
                 <input type="hidden" id="unsuspend-username" name="username">
                 <p>Are you sure you want to unsuspend user: <strong id="unsuspend-username-display"></strong>?</p>
                 <p>This user will be able to log in again.</p>

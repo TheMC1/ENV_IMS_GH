@@ -12,8 +12,8 @@
             <header class="home-header">
                 <h1>Settings</h1>
                 <div class="header-actions">
-                    <a href="{{ url_for('home') }}" class="btn-secondary">Back to Home</a>
-                    <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+                    <a href="{{ url_for('auth.home') }}" class="btn-secondary">Back to Home</a>
+                    <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
                 </div>
             </header>
 
@@ -32,7 +32,7 @@
                     <h2>Account Settings</h2>
                 </div>
 
-                <form method="POST" action="{{ url_for('settings') }}">
+                <form method="POST" action="{{ url_for('settings.settings') }}">
                     <div class="form-card">
                         <h3 style="margin-bottom: 20px; color: #333;">Profile Information</h3>
 
@@ -165,7 +165,7 @@
 
                     <div class="form-actions">
                         <button type="submit" class="btn-success">Save Changes</button>
-                        <a href="{{ url_for('home') }}" class="btn-secondary" style="text-decoration: none; display: inline-block; text-align: center;">Cancel</a>
+                        <a href="{{ url_for('auth.home') }}" class="btn-secondary" style="text-decoration: none; display: inline-block; text-align: center;">Cancel</a>
                     </div>
                 </form>
             </div>

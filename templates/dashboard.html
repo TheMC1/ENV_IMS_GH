@@ -13,8 +13,8 @@
             <header class="home-header">
                 <h1>Dashboard</h1>
                 <div class="header-actions">
-                    <a href="{{ url_for('home') }}" class="btn-secondary">Home</a>
-                    <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+                    <a href="{{ url_for('auth.home') }}" class="btn-secondary">Home</a>
+                    <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
                 </div>
             </header>
 
@@ -1221,7 +1221,7 @@
             }
 
             return `
-                <div class="alert-item ${cssClass}" onclick="window.location.href='{{ url_for('warranties') }}'">
+                <div class="alert-item ${cssClass}" onclick="window.location.href='{{ url_for('warranties.warranties') }}'">
                     <span class="alert-icon">${icon}</span>
                     <div class="alert-content">
                         <div class="alert-title" title="${title}">${displayTitle}</div>
