@@ -911,8 +911,10 @@
         const userRole = '{{ user_role }}';
         const canWrite = ['admin', 'trader'].includes(userRole);
 
-        // Display columns for trades
-        const tradeDisplayColumns = ['DealNumber', 'Counterparty', 'Portfolio', 'Notional', 'TradeType', 'SettleDate', 'Underlier', 'DealCurrency', 'status'];
+        // Dynamic column names from API
+        let tradeIdColumn = 'DealNumber';  // Will be updated from API
+        let tradeQtyColumn = 'Notional';   // Will be updated from API
+        let tradeDisplayColumns = [];      // Will be populated from API headers
 
         // Display columns for inventory
         const inventoryDisplayColumns = ['Serial', 'ProjectID', 'Product', 'Registry', 'Vintage', 'IsCustody'];
@@ -950,6 +952,14 @@
                 }
 
                 allTrades = data.data || [];
+
+                // Update dynamic column names from API
+                tradeIdColumn = data.id_column || 'DealNumber';
+                tradeQtyColumn = data.quantity_column || 'Notional';
+
+                // Use headers from API, excluding internal columns
+                tradeDisplayColumns = (data.headers || []).filter(h => !h.startsWith('_'));
+
                 document.getElementById('tradesCount').textContent = allTrades.length;
                 renderTradesTable();
             } catch (error) {
@@ -973,12 +983,13 @@
             }
 
             tbody.innerHTML = allTrades.map(trade => {
+                const tradeId = trade[tradeIdColumn];
                 const cells = tradeDisplayColumns.map(col => {
                     let value = trade[col] || '';
-                    if (col === 'status') {
-                        const statusClass = 'status-' + value.toLowerCase();
+                    if (col.toLowerCase() === 'status') {
+                        const statusClass = 'status-' + String(value).toLowerCase();
                         value = `<span class="status-badge ${statusClass}">${value}</span>`;
-                    } else if (col === 'Notional') {
+                    } else if (col === tradeQtyColumn) {
                         value = typeof value === 'number' ? value.toLocaleString() : value;
                     }
                     return `<td title="${trade[col] || ''}">${value}</td>`;
@@ -989,21 +1000,28 @@
                     ? `<span class="assigned-count">${assignedCount}</span>`
                     : '-';
 
-                return `<tr data-deal-number="${trade.DealNumber}" class="${selectedTrade?.DealNumber === trade.DealNumber ? 'selected' : ''}"
-                            onclick="selectTrade(${trade.DealNumber})">
+                const selectedTradeId = selectedTrade ? selectedTrade[tradeIdColumn] : null;
+                const isSelected = selectedTradeId === tradeId;
+
+                return `<tr data-trade-id="${tradeId}" class="${isSelected ? 'selected' : ''}"
+                            onclick="selectTrade('${tradeId}')">
                     ${cells}
                     <td>${assignedBadge}</td>
                 </tr>`;
             }).join('');
         }
 
-        async function selectTrade(dealNumber) {
-            selectedTrade = allTrades.find(t => t.DealNumber === dealNumber);
+        async function selectTrade(tradeId) {
+            // Find trade using dynamic ID column, handling type mismatches
+            selectedTrade = allTrades.find(t => {
+                const tid = t[tradeIdColumn];
+                return tid == tradeId || String(tid) === String(tradeId);
+            });
             selectedSerials.clear();
 
             // Update visual selection
             document.querySelectorAll('#tradesBody tr').forEach(row => {
-                row.classList.toggle('selected', row.dataset.dealNumber == dealNumber);
+                row.classList.toggle('selected', row.dataset.tradeId == tradeId);
             });
 
             // Load inventory for this trade
@@ -1013,6 +1031,8 @@
 
         async function loadInventory() {
             if (!selectedTrade) return;
+
+            const tradeId = selectedTrade[tradeIdColumn];
 
             try {
                 // Load unassigned inventory
@@ -1024,7 +1044,7 @@
                 unassignedInventory = applyCustodyFilterToItems(unassignedInventoryFull);
 
                 // Load assigned inventory for selected trade
-                const assignedResp = await fetch(`/api/trades/assigned-inventory/${selectedTrade.DealNumber}`);
+                const assignedResp = await fetch(`/api/trades/assigned-inventory/${tradeId}`);
                 const assignedData = await assignedResp.json();
                 assignedInventory = assignedData.data || [];
 
@@ -1313,26 +1333,40 @@
             const selectedCount = selectedSerials.size;
             const isUnassignedTab = currentTab === 'unassigned';
 
-            const tradeNotional = trade.Notional || 0;
+            // Use dynamic column names
+            const tradeId = trade[tradeIdColumn] || 'N/A';
+            const tradeNotionalRaw = trade[tradeQtyColumn];
+            const tradeNotional = typeof tradeNotionalRaw === 'number' ? tradeNotionalRaw :
+                                  (parseInt(tradeNotionalRaw) || 0);
             const alreadyAssigned = trade._assigned_count || 0;
             const remainingQuantity = tradeNotional - alreadyAssigned;
-            const isFullyAllocated = remainingQuantity <= 0;
+            const isFullyAllocated = tradeNotional > 0 && remainingQuantity <= 0;
 
-            let html = `
-                <div class="trade-details">
-                    <h4>Deal: ${trade.DealNumber}</h4>
-                    <p>Counterparty: <span class="value">${trade.Counterparty || 'N/A'}</span></p>
-                    <p>Portfolio: <span class="value">${trade.Portfolio || 'N/A'}</span></p>
-                    <p>Trade Type: <span class="value">${trade.TradeType || 'N/A'}</span></p>
-                    <p>Notional: <span class="value">${tradeNotional.toLocaleString()}</span></p>
-                    <p>Status: <span class="value">${trade.status || 'N/A'}</span></p>
-                    <p>Currently Assigned: <span class="value">${alreadyAssigned}</span></p>
-                    <p style="font-weight: 600; color: ${isFullyAllocated ? '#28a745' : '#dc3545'};">
-                        Remaining: <span class="value">${remainingQuantity.toLocaleString()}</span>
-                        ${isFullyAllocated ? ' ✓ Fully Allocated' : ''}
-                    </p>
-                </div>
-            `;
+            // Build dynamic trade details display
+            let tradeDetailsHtml = `<h4>Deal: ${tradeId}</h4>`;
+
+            // Show key trade fields dynamically (skip internal columns and ID column)
+            const skipColumns = ['_assigned_count', '_assigned_serials', tradeIdColumn];
+            tradeDisplayColumns.slice(0, 6).forEach(col => {
+                if (!skipColumns.includes(col)) {
+                    let value = trade[col] || 'N/A';
+                    if (col === tradeQtyColumn && typeof value === 'number') {
+                        value = value.toLocaleString();
+                    }
+                    tradeDetailsHtml += `<p>${formatColumnName(col)}: <span class="value">${value}</span></p>`;
+                }
+            });
+
+            // Always show assignment info
+            tradeDetailsHtml += `<p>Currently Assigned: <span class="value">${alreadyAssigned}</span></p>`;
+            if (tradeNotional > 0) {
+                tradeDetailsHtml += `<p style="font-weight: 600; color: ${isFullyAllocated ? '#28a745' : '#dc3545'};">
+                    Remaining: <span class="value">${remainingQuantity.toLocaleString()}</span>
+                    ${isFullyAllocated ? ' ✓ Fully Allocated' : ''}
+                </p>`;
+            }
+
+            let html = `<div class="trade-details">${tradeDetailsHtml}</div>`;
 
             // Show mode toggle only for unassigned tab with write access
             if (isUnassignedTab && canWrite) {
@@ -1349,13 +1383,23 @@
 
                 if (actionMode === 'sell') {
                     // Sell mode - show SELL warranty fields only
+                    // Try to find a counterparty/client field dynamically
+                    const cptyFields = ['Counterparty', 'counterparty', 'Client', 'client', 'Party', 'party'];
+                    let cptyValue = '';
+                    for (const field of cptyFields) {
+                        if (trade[field]) {
+                            cptyValue = trade[field];
+                            break;
+                        }
+                    }
+
                     html += `
                         <div class="warranty-form sell-mode">
                             <h5>Sell Warranty Dates</h5>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Sell Client</label>
-                                    <input type="text" id="sellClient" value="${trade.Counterparty || ''}" placeholder="Client name">
+                                    <input type="text" id="sellClient" value="${cptyValue}" placeholder="Client name">
                                 </div>
                             </div>
                             <div class="form-row">
@@ -1457,20 +1501,23 @@
         async function assignSelected() {
             if (!selectedTrade || selectedSerials.size === 0) return;
 
-            // Validate that assignment doesn't exceed trade notional
-            const tradeNotional = selectedTrade.Notional || 0;
+            // Use dynamic column names
+            const tradeId = selectedTrade[tradeIdColumn];
+            const tradeNotionalRaw = selectedTrade[tradeQtyColumn];
+            const tradeNotional = typeof tradeNotionalRaw === 'number' ? tradeNotionalRaw :
+                                  (parseInt(tradeNotionalRaw) || 0);
             const alreadyAssigned = selectedTrade._assigned_count || 0;
             const remainingQuantity = tradeNotional - alreadyAssigned;
             const selectedCount = selectedSerials.size;
 
-            if (selectedCount > remainingQuantity) {
+            if (tradeNotional > 0 && selectedCount > remainingQuantity) {
                 showWarning(`Cannot assign ${selectedCount} item(s). Only ${remainingQuantity} remaining for this trade (${tradeNotional} total, ${alreadyAssigned} already assigned).`);
                 return;
             }
 
             // Sell mode - only send SELL warranty data
             const payload = {
-                deal_number: selectedTrade.DealNumber,
+                deal_number: tradeId,
                 serials: Array.from(selectedSerials),
                 sell_warranty_start: document.getElementById('sellStart')?.value || null,
                 sell_warranty_end: document.getElementById('sellEnd')?.value || null,
@@ -1489,7 +1536,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showSuccess(`Successfully assigned ${result.assigned_count} item(s) to deal ${selectedTrade.DealNumber}`);
+                    showSuccess(`Successfully assigned ${result.assigned_count} item(s) to deal ${tradeId}`);
                     selectedSerials.clear();
                     await loadTrades();
                     await loadInventory();
@@ -1907,11 +1954,14 @@
             }
 
             const trade = selectedTrade;
-            const tradeNotional = trade.Notional || 0;
+            const tradeId = trade[tradeIdColumn];
+            const tradeNotionalRaw = trade[tradeQtyColumn];
+            const tradeNotional = typeof tradeNotionalRaw === 'number' ? tradeNotionalRaw :
+                                  (parseInt(tradeNotionalRaw) || 0);
             const alreadyAssigned = trade._assigned_count || 0;
             const remainingQuantity = tradeNotional - alreadyAssigned;
 
-            if (remainingQuantity <= 0) {
+            if (tradeNotional > 0 && remainingQuantity <= 0) {
                 showInfo('This trade is fully allocated. No more serials can be created.');
                 return;
             }
@@ -1921,9 +1971,19 @@
             // Get today's date in YYYY-MM-DD format
             const today = new Date().toISOString().split('T')[0];
 
+            // Try to find a counterparty/client field dynamically
+            const counterpartyFields = ['Counterparty', 'counterparty', 'Client', 'client', 'Party', 'party'];
+            let counterpartyValue = '';
+            for (const field of counterpartyFields) {
+                if (trade[field]) {
+                    counterpartyValue = trade[field];
+                    break;
+                }
+            }
+
             // Pre-fill trade info
-            document.getElementById('newSerialTradeId').value = trade.DealNumber;
-            document.getElementById('newSerialBuyClient').value = trade.Counterparty || '';  // Default to Counterparty name
+            document.getElementById('newSerialTradeId').value = tradeId;
+            document.getElementById('newSerialBuyClient').value = counterpartyValue;
             document.getElementById('newSerialBuyStart').value = '';  // Keep empty by default
             document.getElementById('newSerialBuyEnd').value = '';  // Keep empty by default
 
@@ -1970,12 +2030,15 @@
                 return;
             }
 
-            // Validate that serial count matches trade notional
-            const tradeNotional = selectedTrade.Notional || 0;
+            // Validate that serial count matches trade notional (if quantity is defined)
+            const tradeId = selectedTrade[tradeIdColumn];
+            const tradeNotionalRaw = selectedTrade[tradeQtyColumn];
+            const tradeNotional = typeof tradeNotionalRaw === 'number' ? tradeNotionalRaw :
+                                  (parseInt(tradeNotionalRaw) || 0);
             const alreadyAssigned = selectedTrade._assigned_count || 0;
             const remainingQuantity = tradeNotional - alreadyAssigned;
 
-            if (serials.length !== remainingQuantity) {
+            if (tradeNotional > 0 && serials.length !== remainingQuantity) {
                 showWarning(`Serial count (${serials.length}) must match the remaining trade quantity (${remainingQuantity}). Trade requires ${tradeNotional} total, ${alreadyAssigned} already assigned.`);
                 return;
             }
@@ -2008,7 +2071,7 @@
 
                 if (result.success) {
                     closeCreateSerialsModal();
-                    showSuccess(`Successfully created ${result.created_count} serial(s) and assigned to deal ${selectedTrade.DealNumber}`);
+                    showSuccess(`Successfully created ${result.created_count} serial(s) and assigned to deal ${tradeId}`);
                     await loadTrades();
                     await loadInventory();
                     updateAssignmentPanel();

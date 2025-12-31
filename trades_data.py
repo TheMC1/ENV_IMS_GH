@@ -4,11 +4,125 @@ Trades Data Source Module
 This module provides the interface for fetching trade data.
 Currently uses dummy data - replace get_trades_dataframe() with your actual implementation.
 
-The function should return a list of dictionaries, each representing a trade.
+The functions are schema-agnostic and will work with any DataFrame/list structure.
 """
 
 from datetime import datetime, timedelta
 import random
+
+
+def _normalize_to_list(data):
+    """
+    Normalize data to a list of dictionaries.
+    Handles pandas DataFrame, list of dicts, or None.
+
+    Args:
+        data: DataFrame, list of dicts, or None
+
+    Returns:
+        List of dictionaries
+    """
+    if data is None:
+        return []
+
+    # Check if it's a pandas DataFrame
+    try:
+        import pandas as pd
+        if isinstance(data, pd.DataFrame):
+            if data.empty:
+                return []
+            return data.to_dict('records')
+    except ImportError:
+        pass
+
+    # If it's already a list, return as-is
+    if isinstance(data, list):
+        return data
+
+    # If it's a dict (single record), wrap in list
+    if isinstance(data, dict):
+        return [data]
+
+    return []
+
+
+def _get_id_column(trade_record):
+    """
+    Dynamically determine the ID column from a trade record.
+    Looks for common ID column patterns.
+
+    Args:
+        trade_record: A dictionary representing a trade
+
+    Returns:
+        The name of the ID column, or None if not found
+    """
+    if not trade_record:
+        return None
+
+    # Common ID column patterns (case-insensitive search)
+    id_patterns = [
+        'DealNumber', 'deal_number', 'dealnumber',
+        'TradeID', 'trade_id', 'tradeid',
+        'ID', 'Id', 'id',
+        'DealID', 'deal_id', 'dealid',
+        'TransactionID', 'transaction_id',
+        'OrderID', 'order_id'
+    ]
+
+    keys = list(trade_record.keys())
+
+    # First try exact match
+    for pattern in id_patterns:
+        if pattern in keys:
+            return pattern
+
+    # Then try case-insensitive match
+    keys_lower = {k.lower(): k for k in keys}
+    for pattern in id_patterns:
+        if pattern.lower() in keys_lower:
+            return keys_lower[pattern.lower()]
+
+    # Fallback to first column
+    return keys[0] if keys else None
+
+
+def _get_quantity_column(trade_record):
+    """
+    Dynamically determine the quantity/notional column from a trade record.
+
+    Args:
+        trade_record: A dictionary representing a trade
+
+    Returns:
+        The name of the quantity column, or None if not found
+    """
+    if not trade_record:
+        return None
+
+    # Common quantity column patterns
+    qty_patterns = [
+        'Notional', 'notional',
+        'Quantity', 'quantity', 'Qty', 'qty',
+        'Amount', 'amount',
+        'Volume', 'volume',
+        'Size', 'size',
+        'Units', 'units'
+    ]
+
+    keys = list(trade_record.keys())
+
+    for pattern in qty_patterns:
+        if pattern in keys:
+            return pattern
+
+    # Case-insensitive fallback
+    keys_lower = {k.lower(): k for k in keys}
+    for pattern in qty_patterns:
+        if pattern.lower() in keys_lower:
+            return keys_lower[pattern.lower()]
+
+    return None
 
 
 def get_trades_dataframe():
@@ -16,17 +130,6 @@ def get_trades_dataframe():
     Fetch trades data from external source.
 
     Returns a list of dictionaries with trade information.
-    Core schema fields:
-        - DealNumber (int): Unique deal identifier
-        - Counterparty (str): Trading counterparty name
-        - Portfolio (str): Portfolio/book name
-        - Notional (int): Notional amount
-        - TradeType (str): Type of trade (Spot, Forward, Option, etc.)
-        - SettleDate (date): Settlement date
-        - Underlier (str): Underlying asset/instrument
-        - DealCurrency (str): Currency code (USD, EUR, GBP, etc.)
-
-    Additional metadata fields can be added as needed.
     The schema is flexible and will be displayed dynamically.
 
     TODO: Replace this dummy implementation with actual data source
@@ -36,9 +139,6 @@ def get_trades_dataframe():
     # DUMMY DATA - Replace this section with your actual data fetching logic
     # =========================================================================
 
-    # Generate sample trades for demonstration
-    # Schema: DealNumber(int), Counterparty(str), Portfolio(str), Notional(int),
-    #         TradeType(str), SettleDate(date), Underlier(str), DealCurrency(str)
     dummy_trades = [
         {
             'DealNumber': 1001,
@@ -110,79 +210,156 @@ def get_trades_dataframe():
     return dummy_trades
 
     # =========================================================================
-    # Example of how to replace with actual implementation:
+    # Example implementations (uncomment and modify as needed):
     #
     # import pandas as pd
+    #
+    # # Option 1: From API - returns DataFrame or list
     # import requests
-    #
-    # # Option 1: From API
     # response = requests.get('https://your-api.com/trades')
-    # trades = response.json()
-    # return trades
+    # return response.json()  # Works with list of dicts
     #
-    # # Option 2: From database
+    # # Option 2: From database - returns DataFrame
     # import sqlite3
     # conn = sqlite3.connect('trades.db')
     # df = pd.read_sql_query("SELECT * FROM trades", conn)
-    # return df.to_dict('records')
+    # return df  # DataFrame is automatically normalized
     #
-    # # Option 3: From CSV/Excel
+    # # Option 3: From CSV/Excel - returns DataFrame
     # df = pd.read_excel('trades.xlsx')
-    # return df.to_dict('records')
+    # return df  # DataFrame is automatically normalized
     # =========================================================================
 
 
-def get_trade_by_id(deal_number):
+def get_trade_by_id(trade_id):
     """
-    Get a specific trade by its DealNumber.
+    Get a specific trade by its ID (schema-agnostic).
+    Automatically detects the ID column from the data.
 
     Args:
-        deal_number: The unique deal number identifier
+        trade_id: The unique trade identifier (will be compared as-is and as int/str)
 
     Returns:
         Trade dictionary or None if not found
     """
-    trades = get_trades_dataframe()
+    raw_data = get_trades_dataframe()
+    trades = _normalize_to_list(raw_data)
+
+    if not trades:
+        return None
+
+    # Determine the ID column dynamically
+    id_column = _get_id_column(trades[0])
+
+    if not id_column:
+        return None
+
+    # Search for the trade, handling type mismatches
     for trade in trades:
-        if trade.get('DealNumber') == deal_number:
-            return trade
+        trade_value = trade.get(id_column)
+
+        # Direct comparison
+        if trade_value == trade_id:
+            return dict(trade)  # Return a copy as dict
+
+        # Try numeric comparison (handle string vs int mismatches)
+        try:
+            if int(trade_value) == int(trade_id):
+                return dict(trade)
+        except (ValueError, TypeError):
+            pass
+
+        # Try string comparison
+        if str(trade_value) == str(trade_id):
+            return dict(trade)
+
     return None
 
 
 def get_trade_headers():
     """
-    Get the column headers for trades display.
+    Get the column headers for trades display (schema-agnostic).
+    Dynamically extracts headers from the data.
 
     Returns:
-        List of column names in preferred display order
+        List of column names in display order
     """
-    # Define preferred column order
-    preferred_order = [
-        'DealNumber',
-        'Counterparty',
-        'Portfolio',
-        'Notional',
-        'TradeType',
-        'SettleDate',
-        'Underlier',
-        'DealCurrency',
-        'status',
-        'trader',
-        'notes'
-    ]
+    raw_data = get_trades_dataframe()
+    trades = _normalize_to_list(raw_data)
 
-    trades = get_trades_dataframe()
     if not trades:
-        return preferred_order
+        return []
 
-    # Get all unique keys
+    # Get all unique keys from all trades
     all_keys = set()
     for trade in trades:
         all_keys.update(trade.keys())
 
-    # Order by preferred, then alphabetically for remaining
-    ordered = [h for h in preferred_order if h in all_keys]
-    remaining = sorted([h for h in all_keys if h not in preferred_order])
-    ordered.extend(remaining)
+    # Define preferred column patterns for ordering (generic patterns)
+    preferred_patterns = [
+        # ID columns first
+        'id', 'deal', 'trade', 'transaction', 'order',
+        # Then counterparty/client
+        'counterparty', 'client', 'party', 'customer',
+        # Portfolio/book
+        'portfolio', 'book', 'account',
+        # Quantity/amount
+        'notional', 'quantity', 'qty', 'amount', 'volume', 'size',
+        # Type
+        'type', 'tradetype', 'deal_type',
+        # Dates
+        'date', 'settle', 'trade_date', 'value_date',
+        # Product/asset
+        'underlier', 'product', 'asset', 'instrument', 'security',
+        # Currency
+        'currency', 'ccy',
+        # Status
+        'status', 'state',
+    ]
+
+    def get_sort_key(col):
+        """Generate sort key based on preferred patterns."""
+        col_lower = col.lower()
+        for i, pattern in enumerate(preferred_patterns):
+            if pattern in col_lower:
+                return (i, col)
+        return (len(preferred_patterns), col)
+
+    # Sort columns by preference, then alphabetically
+    ordered = sorted(all_keys, key=get_sort_key)
 
     return ordered
+
+
+def get_id_column_name():
+    """
+    Get the name of the ID column in the trades data.
+    Useful for external code that needs to know the ID field name.
+
+    Returns:
+        String name of the ID column, or None if no data
+    """
+    raw_data = get_trades_dataframe()
+    trades = _normalize_to_list(raw_data)
+
+    if not trades:
+        return None
+
+    return _get_id_column(trades[0])
+
+
+def get_quantity_column_name():
+    """
+    Get the name of the quantity/notional column in the trades data.
+    Useful for external code that needs to know the quantity field name.
+
+    Returns:
+        String name of the quantity column, or None if not found
+    """
+    raw_data = get_trades_dataframe()
+    trades = _normalize_to_list(raw_data)
+
+    if not trades:
+        return None
+
+    return _get_quantity_column(trades[0])

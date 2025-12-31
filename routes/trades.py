@@ -13,7 +13,10 @@ from database import (
     unassign_inventory_from_trade,
     create_serials_for_trade
 )
-from trades_data import get_trades_dataframe, get_trade_by_id, get_trade_headers
+from trades_data import (
+    get_trades_dataframe, get_trade_by_id, get_trade_headers,
+    get_id_column_name, get_quantity_column_name, _normalize_to_list
+)
 
 trades_bp = Blueprint('trades', __name__)
 
@@ -34,19 +37,25 @@ def trades():
 def get_trades():
     """Get all trades from external data source"""
     try:
-        trades_list = get_trades_dataframe()
+        raw_data = get_trades_dataframe()
+        trades_list = _normalize_to_list(raw_data)
         headers = get_trade_headers()
+
+        # Get the ID column name dynamically
+        id_column = get_id_column_name()
 
         # Add assignment status to each trade
         for trade in trades_list:
-            deal_number = trade.get('DealNumber', '')
+            deal_number = trade.get(id_column, '') if id_column else ''
             assigned_items = get_inventory_by_trade(deal_number)
             trade['_assigned_count'] = len(assigned_items)
             trade['_assigned_serials'] = [item['Serial'] for item in assigned_items]
 
         return jsonify({
             'headers': headers,
-            'data': trades_list
+            'data': trades_list,
+            'id_column': get_id_column_name(),
+            'quantity_column': get_quantity_column_name()
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -191,11 +200,17 @@ def bulk_assign_to_trade():
         # Validate against trade notional (quantity)
         trade = get_trade_by_id(deal_number)
         if trade:
-            trade_notional = trade.get('Notional', 0)
+            qty_column = get_quantity_column_name()
+            trade_notional = trade.get(qty_column, 0) if qty_column else 0
+            try:
+                trade_notional = int(trade_notional) if trade_notional else 0
+            except (ValueError, TypeError):
+                trade_notional = 0
+
             already_assigned = len(get_inventory_by_trade(deal_number))
             remaining_quantity = trade_notional - already_assigned
 
-            if len(serials) > remaining_quantity:
+            if remaining_quantity > 0 and len(serials) > remaining_quantity:
                 return jsonify({
                     'error': f'Cannot assign {len(serials)} item(s). Only {remaining_quantity} remaining for this trade.'
                 }), 400
@@ -243,11 +258,17 @@ def create_serials():
         # Validate against trade notional - must match exactly
         trade = get_trade_by_id(deal_number)
         if trade:
-            trade_notional = trade.get('Notional', 0)
+            qty_column = get_quantity_column_name()
+            trade_notional = trade.get(qty_column, 0) if qty_column else 0
+            try:
+                trade_notional = int(trade_notional) if trade_notional else 0
+            except (ValueError, TypeError):
+                trade_notional = 0
+
             already_assigned = len(get_inventory_by_trade(deal_number))
             remaining_quantity = trade_notional - already_assigned
 
-            if len(serials) != remaining_quantity:
+            if remaining_quantity > 0 and len(serials) != remaining_quantity:
                 return jsonify({
                     'error': f'Serial count ({len(serials)}) must match remaining trade quantity ({remaining_quantity}). Trade requires {trade_notional} total, {already_assigned} already assigned.'
                 }), 400
