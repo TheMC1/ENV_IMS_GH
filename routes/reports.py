@@ -4,7 +4,7 @@ Provides high-level statistics and reporting functionality
 """
 
 from flask import Blueprint, render_template, request, session, jsonify, Response
-from routes.auth import login_required
+from routes.auth import login_required, page_access_required
 from database import (
     get_user_by_username,
     get_all_inventory_items,
@@ -302,6 +302,7 @@ def get_filter_options():
 
 @reports_bp.route('/reports')
 @login_required
+@page_access_required('reports')
 def reports():
     """Display reports page"""
     username = session.get('user')

@@ -82,6 +82,32 @@ def init_database():
         )
     ''')
 
+    # Create role_permissions table for storing page access by role
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS role_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT UNIQUE NOT NULL,
+            allowed_pages TEXT NOT NULL DEFAULT '[]',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Initialize default role permissions if not exist
+    default_permissions = {
+        'admin': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'users', 'settings', 'backups'],
+        'trader': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'settings'],
+        'ops': ['dashboard', 'inventory', 'warranties', 'reports', 'settings'],
+        'user': ['dashboard', 'inventory', 'warranties', 'reports', 'settings']
+    }
+
+    for role, pages in default_permissions.items():
+        cursor.execute("SELECT COUNT(*) FROM role_permissions WHERE role = ?", (role,))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute(
+                "INSERT INTO role_permissions (role, allowed_pages) VALUES (?, ?)",
+                (role, json.dumps(pages))
+            )
+
     cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
     if cursor.fetchone()[0] == 0:
         cursor.execute(
@@ -1408,6 +1434,98 @@ def create_serials_for_trade(serials, trade_id, inventory_data, warranty_data):
         return True, f"Successfully created {created_count} serial(s)", created_count
     except Exception as e:
         return False, str(e), 0
+
+
+# Role Permissions Functions
+def get_all_role_permissions():
+    """Get all role permissions"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role, allowed_pages FROM role_permissions ORDER BY role")
+        rows = cursor.fetchall()
+        conn.close()
+
+        result = {}
+        for row in rows:
+            result[row['role']] = json.loads(row['allowed_pages'])
+        return result
+    except Exception as e:
+        print(f"Error getting role permissions: {e}")
+        return {}
+
+
+def get_role_permissions(role):
+    """Get permissions for a specific role"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT allowed_pages FROM role_permissions WHERE role = ?", (role,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return json.loads(row['allowed_pages'])
+        return []
+    except Exception as e:
+        print(f"Error getting role permissions: {e}")
+        return []
+
+
+def update_role_permissions(role, allowed_pages):
+    """Update permissions for a role"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT OR REPLACE INTO role_permissions (role, allowed_pages, updated_at)
+               VALUES (?, ?, CURRENT_TIMESTAMP)""",
+            (role, json.dumps(allowed_pages))
+        )
+        conn.commit()
+        conn.close()
+        return True, "Permissions updated successfully"
+    except Exception as e:
+        return False, str(e)
+
+
+def check_page_access(username, page):
+    """Check if a user has access to a specific page"""
+    try:
+        user = get_user_by_username(username)
+        if not user:
+            return False
+
+        role = user['role']
+
+        # Admin always has access to everything
+        if role == 'admin':
+            return True
+
+        allowed_pages = get_role_permissions(role)
+        return page in allowed_pages
+    except Exception as e:
+        print(f"Error checking page access: {e}")
+        return False
+
+
+def get_available_pages():
+    """Get list of all available pages in the system"""
+    return [
+        {'id': 'dashboard', 'name': 'Dashboard', 'description': 'System overview and analytics'},
+        {'id': 'inventory', 'name': 'Inventory', 'description': 'Manage inventory items'},
+        {'id': 'warranties', 'name': 'Warranties', 'description': 'Manage warranty information'},
+        {'id': 'trades', 'name': 'Trades', 'description': 'Manage trades and assignments'},
+        {'id': 'reports', 'name': 'Reports', 'description': 'View reports and statistics'},
+        {'id': 'settings', 'name': 'Settings', 'description': 'User settings and preferences'},
+        {'id': 'users', 'name': 'User Management', 'description': 'Manage users (admin only)'},
+        {'id': 'backups', 'name': 'Backups', 'description': 'System backups (admin only)'}
+    ]
+
+
+def get_available_roles():
+    """Get list of available roles"""
+    return ['admin', 'trader', 'ops', 'user']
 
 
 if __name__ == '__main__':

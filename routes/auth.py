@@ -4,7 +4,7 @@ Authentication routes and decorators for Carbon IMS
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from functools import wraps
-from database import get_user_by_username, verify_user_password
+from database import get_user_by_username, verify_user_password, check_page_access
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -49,6 +49,25 @@ def write_access_required(f):
             return jsonify({'error': 'You do not have permission to modify the inventory. Your role is read-only.'}), 403
         return f(*args, **kwargs)
     return decorated_function
+
+
+def page_access_required(page_id):
+    """Decorator to check if user has access to a specific page based on role permissions"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user' not in session:
+                flash('Please log in to access this page.', 'warning')
+                return redirect(url_for('auth.login'))
+
+            username = session['user']
+            if not check_page_access(username, page_id):
+                flash('You do not have permission to access this page.', 'danger')
+                return redirect(url_for('auth.home'))
+
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 
 @auth_bp.route('/')

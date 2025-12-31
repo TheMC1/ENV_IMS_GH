@@ -4,7 +4,7 @@ Dashboard and analytics routes for Carbon IMS
 
 from flask import Blueprint, render_template, request, session, jsonify
 from datetime import datetime, timedelta
-from routes.auth import login_required
+from routes.auth import login_required, page_access_required
 from database import (
     get_user_by_username,
     get_all_inventory_items,
@@ -16,6 +16,7 @@ dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/dashboard')
 @login_required
+@page_access_required('dashboard')
 def dashboard():
     """Display analytics dashboard"""
     username = session.get('user')

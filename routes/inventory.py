@@ -3,7 +3,7 @@ Inventory management routes for Carbon IMS
 """
 
 from flask import Blueprint, render_template, request, session, jsonify
-from routes.auth import login_required, write_access_required
+from routes.auth import login_required, write_access_required, page_access_required
 from database import (
     get_user_by_username,
     get_all_inventory_items,
@@ -20,6 +20,7 @@ inventory_bp = Blueprint('inventory', __name__)
 
 @inventory_bp.route('/inventory')
 @login_required
+@page_access_required('inventory')
 def inventory():
     """Display inventory management page"""
     username = session.get('user')

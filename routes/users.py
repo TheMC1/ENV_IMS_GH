@@ -2,7 +2,7 @@
 User management routes for Carbon IMS
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from routes.auth import admin_required
 from database import (
     get_user_by_username,
@@ -12,7 +12,12 @@ from database import (
     delete_user as db_delete_user,
     reset_user_password as db_reset_password,
     suspend_user as db_suspend_user,
-    unsuspend_user as db_unsuspend_user
+    unsuspend_user as db_unsuspend_user,
+    get_all_role_permissions,
+    get_role_permissions,
+    update_role_permissions,
+    get_available_pages,
+    get_available_roles
 )
 
 users_bp = Blueprint('users', __name__)
@@ -159,3 +164,58 @@ def unsuspend_user():
     else:
         flash(message, 'danger')
     return redirect(url_for('users.manage_users'))
+
+
+# Role Permissions API Endpoints
+@users_bp.route('/api/roles/permissions', methods=['GET'])
+@admin_required
+def get_permissions():
+    """Get all role permissions"""
+    try:
+        permissions = get_all_role_permissions()
+        pages = get_available_pages()
+        roles = get_available_roles()
+
+        return jsonify({
+            'permissions': permissions,
+            'pages': pages,
+            'roles': roles
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@users_bp.route('/api/roles/permissions/<role>', methods=['GET'])
+@admin_required
+def get_role_perms(role):
+    """Get permissions for a specific role"""
+    try:
+        permissions = get_role_permissions(role)
+        return jsonify({'role': role, 'allowed_pages': permissions})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@users_bp.route('/api/roles/permissions/<role>', methods=['POST'])
+@admin_required
+def update_role_perms(role):
+    """Update permissions for a role"""
+    try:
+        data = request.json
+        allowed_pages = data.get('allowed_pages', [])
+
+        # Admin role must always have access to users and settings
+        if role == 'admin':
+            if 'users' not in allowed_pages:
+                allowed_pages.append('users')
+            if 'settings' not in allowed_pages:
+                allowed_pages.append('settings')
+
+        success, message = update_role_permissions(role, allowed_pages)
+
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

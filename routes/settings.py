@@ -3,7 +3,7 @@ Settings and user preferences routes for Carbon IMS
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
-from routes.auth import login_required
+from routes.auth import login_required, page_access_required
 from database import (
     get_user_by_username,
     verify_user_password,
@@ -18,6 +18,7 @@ settings_bp = Blueprint('settings', __name__)
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 @login_required
+@page_access_required('settings')
 def settings():
     """User settings and preferences page"""
     username = session.get('user')

@@ -3,7 +3,7 @@ Trades management routes for Carbon IMS
 """
 
 from flask import Blueprint, render_template, request, session, jsonify
-from routes.auth import login_required, write_access_required
+from routes.auth import login_required, write_access_required, page_access_required
 from database import (
     get_user_by_username,
     get_all_inventory_items,
@@ -20,6 +20,7 @@ trades_bp = Blueprint('trades', __name__)
 
 @trades_bp.route('/trades')
 @login_required
+@page_access_required('trades')
 def trades():
     """Display trades management page"""
     username = session.get('user')

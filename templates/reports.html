@@ -11,7 +11,7 @@
             padding: 0;
             min-height: 100vh;
             background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
-                        url('https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?q=80&w=1920&auto=format&fit=crop') center/cover no-repeat fixed;
+                        url('/static/bg-forest.jpg') center/cover no-repeat fixed;
         }
 
         .container {
@@ -53,6 +53,9 @@
         }
 
         .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             padding: 10px 20px;
             border: none;
             border-radius: 6px;
@@ -61,6 +64,9 @@
             cursor: pointer;
             text-decoration: none;
             transition: all 0.2s;
+            height: 40px;
+            box-sizing: border-box;
+            white-space: nowrap;
         }
 
         .btn-primary {

@@ -3,7 +3,7 @@ Warranty management routes for Carbon IMS
 """
 
 from flask import Blueprint, render_template, request, session, jsonify
-from routes.auth import login_required, write_access_required
+from routes.auth import login_required, write_access_required, page_access_required
 from database import (
     get_user_by_username,
     get_all_warranty_items,
@@ -19,6 +19,7 @@ warranties_bp = Blueprint('warranties', __name__)
 
 @warranties_bp.route('/warranties')
 @login_required
+@page_access_required('warranties')
 def warranties():
     """Display warranty management page"""
     username = session.get('user')

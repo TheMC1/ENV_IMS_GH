@@ -3,7 +3,7 @@ Routes package for Carbon IMS
 Contains Flask blueprints for modular routing.
 """
 
-from routes.auth import auth_bp, login_required, admin_required, write_access_required
+from routes.auth import auth_bp, login_required, admin_required, write_access_required, page_access_required
 from routes.users import users_bp
 from routes.inventory import inventory_bp
 from routes.backups import backups_bp
@@ -27,5 +27,6 @@ __all__ = [
     'reports_bp',
     'login_required',
     'admin_required',
-    'write_access_required'
+    'write_access_required',
+    'page_access_required'
 ]
