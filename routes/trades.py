@@ -11,11 +11,13 @@ from database import (
     get_inventory_by_trade,
     assign_inventory_to_trade,
     unassign_inventory_from_trade,
-    create_serials_for_trade
+    create_serials_for_trade,
+    log_activity
 )
 from trades_data import (
     get_trades_dataframe, get_trade_by_id, get_trade_headers,
-    get_id_column_name, get_quantity_column_name, _normalize_to_list
+    get_id_column_name, get_quantity_column_name, get_counterparty_column_name,
+    _normalize_to_list
 )
 
 trades_bp = Blueprint('trades', __name__)
@@ -55,7 +57,8 @@ def get_trades():
             'headers': headers,
             'data': trades_list,
             'id_column': get_id_column_name(),
-            'quantity_column': get_quantity_column_name()
+            'quantity_column': get_quantity_column_name(),
+            'counterparty_column': get_counterparty_column_name()
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -120,6 +123,7 @@ def assign_to_trade():
         serials = data.get('serials', [])
         trade_id = data.get('trade_id')
         warranty_data = data.get('warranty_data')
+        username = session.get('user')
 
         if not serials:
             return jsonify({'error': 'No serials provided'}), 400
@@ -129,6 +133,17 @@ def assign_to_trade():
         success, message, count = assign_inventory_to_trade(serials, trade_id, warranty_data)
 
         if success:
+            # Log the activity for each serial
+            for serial in serials:
+                log_activity(
+                    username=username,
+                    action_type='assign',
+                    target_type='trade',
+                    target_id=str(trade_id),
+                    serial=serial,
+                    details=f'Assigned serial {serial} to trade {trade_id}',
+                    after_data={'trade_id': trade_id, 'serial': serial, 'warranty_data': warranty_data}
+                )
             return jsonify({
                 'success': True,
                 'message': message,
@@ -148,13 +163,33 @@ def unassign_from_trade():
     try:
         data = request.json
         serials = data.get('serials', [])
+        username = session.get('user')
 
         if not serials:
             return jsonify({'error': 'No serials provided'}), 400
 
+        # Get current trade assignments before unassigning
+        items = get_all_inventory_items()
+        serial_trade_map = {}
+        for item in items:
+            if item.get('Serial') in serials:
+                serial_trade_map[item.get('Serial')] = item.get('TradeID', item.get('trade_id', ''))
+
         success, message, count = unassign_inventory_from_trade(serials)
 
         if success:
+            # Log the activity for each serial
+            for serial in serials:
+                previous_trade = serial_trade_map.get(serial, '')
+                log_activity(
+                    username=username,
+                    action_type='unassign',
+                    target_type='trade',
+                    target_id=str(previous_trade) if previous_trade else '',
+                    serial=serial,
+                    details=f'Unassigned serial {serial} from trade {previous_trade}',
+                    before_data={'trade_id': previous_trade, 'serial': serial}
+                )
             return jsonify({
                 'success': True,
                 'message': message,
@@ -178,6 +213,7 @@ def bulk_assign_to_trade():
         data = request.json
         deal_number = data.get('deal_number')
         serials = data.get('serials', [])
+        username = session.get('user')
 
         # Warranty data to apply to all assigned items
         warranty_data = {
@@ -219,6 +255,21 @@ def bulk_assign_to_trade():
         success, message, count = assign_inventory_to_trade(serials, deal_number, warranty_data)
 
         if success:
+            # Log the bulk assignment activity
+            log_activity(
+                username=username,
+                action_type='bulk_assign',
+                target_type='trade',
+                target_id=str(deal_number),
+                details=f'Bulk assigned {count} item(s) to trade {deal_number}',
+                after_data={
+                    'trade_id': deal_number,
+                    'serials': serials,
+                    'warranty_data': warranty_data,
+                    'count': count
+                }
+            )
+
             # Get updated trade info
             trade = get_trade_by_id(deal_number)
             assigned_items = get_inventory_by_trade(deal_number)
@@ -248,6 +299,7 @@ def create_serials():
         data = request.json
         deal_number = data.get('deal_number')
         serials = data.get('serials', [])
+        username = session.get('user')
 
         if not deal_number:
             return jsonify({'error': 'Deal Number is required'}), 400
@@ -298,6 +350,23 @@ def create_serials():
         )
 
         if success:
+            # Log the activity for each created serial
+            for serial in serials:
+                log_activity(
+                    username=username,
+                    action_type='create_serial',
+                    target_type='trade',
+                    target_id=str(deal_number),
+                    serial=serial,
+                    details=f'Created serial {serial} and assigned to trade {deal_number}',
+                    after_data={
+                        'trade_id': deal_number,
+                        'serial': serial,
+                        'inventory_data': inventory_data,
+                        'warranty_data': warranty_data
+                    }
+                )
+
             # Get updated trade info
             trade = get_trade_by_id(deal_number)
             assigned_items = get_inventory_by_trade(deal_number)

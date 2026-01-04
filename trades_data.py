@@ -11,6 +11,27 @@ from datetime import datetime, timedelta
 import random
 
 
+# =============================================================================
+# COLUMN NAME OVERRIDES
+# Set these to explicitly specify column names, or leave as None for auto-detect
+# =============================================================================
+TRADE_ID_COLUMN = None          # e.g., 'DealNumber', 'TradeID', 'ID'
+TRADE_QUANTITY_COLUMN = None    # e.g., 'Notional', 'Quantity', 'Amount'
+TRADE_COUNTERPARTY_COLUMN = None  # e.g., 'Counterparty', 'Client', 'Party'
+# =============================================================================
+
+# =============================================================================
+# DISPLAY COLUMNS OVERRIDE
+# Set this list to manually specify which columns to display in the trades table.
+# If set, ONLY these columns will be shown in the specified order.
+# Leave as None to auto-detect and display all columns.
+# =============================================================================
+DISPLAY_COLUMNS = None
+# Example:
+# DISPLAY_COLUMNS = ['DealNumber', 'Counterparty', 'Notional', 'TradeType', 'status']
+# =============================================================================
+
+
 def _normalize_to_list(data):
     """
     Normalize data to a list of dictionaries.
@@ -49,7 +70,7 @@ def _normalize_to_list(data):
 def _get_id_column(trade_record):
     """
     Dynamically determine the ID column from a trade record.
-    Looks for common ID column patterns.
+    Uses TRADE_ID_COLUMN override if set, otherwise auto-detects.
 
     Args:
         trade_record: A dictionary representing a trade
@@ -57,6 +78,10 @@ def _get_id_column(trade_record):
     Returns:
         The name of the ID column, or None if not found
     """
+    # Use override if specified
+    if TRADE_ID_COLUMN:
+        return TRADE_ID_COLUMN
+
     if not trade_record:
         return None
 
@@ -90,6 +115,7 @@ def _get_id_column(trade_record):
 def _get_quantity_column(trade_record):
     """
     Dynamically determine the quantity/notional column from a trade record.
+    Uses TRADE_QUANTITY_COLUMN override if set, otherwise auto-detects.
 
     Args:
         trade_record: A dictionary representing a trade
@@ -97,6 +123,10 @@ def _get_quantity_column(trade_record):
     Returns:
         The name of the quantity column, or None if not found
     """
+    # Use override if specified
+    if TRADE_QUANTITY_COLUMN:
+        return TRADE_QUANTITY_COLUMN
+
     if not trade_record:
         return None
 
@@ -119,6 +149,51 @@ def _get_quantity_column(trade_record):
     # Case-insensitive fallback
     keys_lower = {k.lower(): k for k in keys}
     for pattern in qty_patterns:
+        if pattern.lower() in keys_lower:
+            return keys_lower[pattern.lower()]
+
+    return None
+
+
+def _get_counterparty_column(trade_record):
+    """
+    Dynamically determine the counterparty/client column from a trade record.
+    Uses TRADE_COUNTERPARTY_COLUMN override if set, otherwise auto-detects.
+
+    Args:
+        trade_record: A dictionary representing a trade
+
+    Returns:
+        The name of the counterparty column, or None if not found
+    """
+    # Use override if specified
+    if TRADE_COUNTERPARTY_COLUMN:
+        return TRADE_COUNTERPARTY_COLUMN
+
+    if not trade_record:
+        return None
+
+    # Common counterparty column patterns
+    cpty_patterns = [
+        'Counterparty', 'counterparty',
+        'Client', 'client',
+        'Party', 'party',
+        'Customer', 'customer',
+        'Account', 'account',
+        'Trader', 'trader',
+        'CounterpartyName', 'counterparty_name',
+        'ClientName', 'client_name'
+    ]
+
+    keys = list(trade_record.keys())
+
+    for pattern in cpty_patterns:
+        if pattern in keys:
+            return pattern
+
+    # Case-insensitive fallback
+    keys_lower = {k.lower(): k for k in keys}
+    for pattern in cpty_patterns:
         if pattern.lower() in keys_lower:
             return keys_lower[pattern.lower()]
 
@@ -284,6 +359,10 @@ def get_trade_headers():
     Returns:
         List of column names in display order
     """
+    # Use manual override if specified
+    if DISPLAY_COLUMNS:
+        return DISPLAY_COLUMNS
+
     raw_data = get_trades_dataframe()
     trades = _normalize_to_list(raw_data)
 
@@ -363,3 +442,20 @@ def get_quantity_column_name():
         return None
 
     return _get_quantity_column(trades[0])
+
+
+def get_counterparty_column_name():
+    """
+    Get the name of the counterparty/client column in the trades data.
+    Useful for external code that needs to know the counterparty field name.
+
+    Returns:
+        String name of the counterparty column, or None if not found
+    """
+    raw_data = get_trades_dataframe()
+    trades = _normalize_to_list(raw_data)
+
+    if not trades:
+        return None
+
+    return _get_counterparty_column(trades[0])

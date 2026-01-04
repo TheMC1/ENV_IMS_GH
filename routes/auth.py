@@ -4,7 +4,7 @@ Authentication routes and decorators for Carbon IMS
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from functools import wraps
-from database import get_user_by_username, verify_user_password, check_page_access
+from database import get_user_by_username, verify_user_password, check_page_access, log_activity
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -96,9 +96,25 @@ def login():
         if success:
             session['user'] = username
             session.permanent = False
+
+            # Log successful login
+            log_activity(
+                username=username,
+                action_type='login',
+                target_type='system',
+                details=f'User {username} logged in successfully'
+            )
+
             flash(f'Welcome back, {username}!', 'success')
             return redirect(url_for('auth.home'))
         else:
+            # Log failed login attempt
+            log_activity(
+                username=username or 'unknown',
+                action_type='login_failed',
+                target_type='system',
+                details=f'Failed login attempt for user: {username}'
+            )
             flash(message, 'danger')
             return render_template('login.html')
 
@@ -119,6 +135,16 @@ def home():
 @auth_bp.route('/logout')
 def logout():
     """Handle user logout"""
+    username = session.get('user', 'unknown')
+
+    # Log logout before clearing session
+    log_activity(
+        username=username,
+        action_type='logout',
+        target_type='system',
+        details=f'User {username} logged out'
+    )
+
     session.pop('user', None)
     flash('You have been logged out successfully.', 'info')
     return redirect(url_for('auth.login'))

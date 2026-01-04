@@ -912,9 +912,10 @@
         const canWrite = ['admin', 'trader'].includes(userRole);
 
         // Dynamic column names from API
-        let tradeIdColumn = 'DealNumber';  // Will be updated from API
-        let tradeQtyColumn = 'Notional';   // Will be updated from API
-        let tradeDisplayColumns = [];      // Will be populated from API headers
+        let tradeIdColumn = 'DealNumber';       // Will be updated from API
+        let tradeQtyColumn = 'Notional';        // Will be updated from API
+        let tradeCptyColumn = 'Counterparty';   // Will be updated from API
+        let tradeDisplayColumns = [];           // Will be populated from API headers
 
         // Display columns for inventory
         const inventoryDisplayColumns = ['Serial', 'ProjectID', 'Product', 'Registry', 'Vintage', 'IsCustody'];
@@ -956,6 +957,7 @@
                 // Update dynamic column names from API
                 tradeIdColumn = data.id_column || 'DealNumber';
                 tradeQtyColumn = data.quantity_column || 'Notional';
+                tradeCptyColumn = data.counterparty_column || 'Counterparty';
 
                 // Use headers from API, excluding internal columns
                 tradeDisplayColumns = (data.headers || []).filter(h => !h.startsWith('_'));
@@ -1383,15 +1385,8 @@
 
                 if (actionMode === 'sell') {
                     // Sell mode - show SELL warranty fields only
-                    // Try to find a counterparty/client field dynamically
-                    const cptyFields = ['Counterparty', 'counterparty', 'Client', 'client', 'Party', 'party'];
-                    let cptyValue = '';
-                    for (const field of cptyFields) {
-                        if (trade[field]) {
-                            cptyValue = trade[field];
-                            break;
-                        }
-                    }
+                    // Use dynamic counterparty column
+                    const cptyValue = tradeCptyColumn ? (trade[tradeCptyColumn] || '') : '';
 
                     html += `
                         <div class="warranty-form sell-mode">
@@ -1971,15 +1966,8 @@
             // Get today's date in YYYY-MM-DD format
             const today = new Date().toISOString().split('T')[0];
 
-            // Try to find a counterparty/client field dynamically
-            const counterpartyFields = ['Counterparty', 'counterparty', 'Client', 'client', 'Party', 'party'];
-            let counterpartyValue = '';
-            for (const field of counterpartyFields) {
-                if (trade[field]) {
-                    counterpartyValue = trade[field];
-                    break;
-                }
-            }
+            // Use dynamic counterparty column
+            const counterpartyValue = tradeCptyColumn ? (trade[tradeCptyColumn] || '') : '';
 
             // Pre-fill trade info
             document.getElementById('newSerialTradeId').value = tradeId;

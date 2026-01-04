@@ -2,8 +2,10 @@
 Inventory management routes for Carbon IMS
 """
 
+import csv
+import io
 from flask import Blueprint, render_template, request, session, jsonify
-from routes.auth import login_required, write_access_required, page_access_required
+from routes.auth import login_required, write_access_required, page_access_required, admin_required
 from database import (
     get_user_by_username,
     get_all_inventory_items,
@@ -12,7 +14,10 @@ from database import (
     update_inventory_item,
     delete_inventory_item,
     create_inventory_backup,
-    get_user_page_settings
+    get_user_page_settings,
+    verify_user_password,
+    get_inventory_db_connection,
+    log_activity
 )
 
 inventory_bp = Blueprint('inventory', __name__)
@@ -71,6 +76,11 @@ def update_inventory():
         row_data = request.json.get('data')
         username = session.get('user')
 
+        # Get before data for logging
+        items = get_all_inventory_items()
+        before_item = next((item for item in items if item.get('_row_index') == row_index), None)
+        serial = row_data.get('Serial', before_item.get('Serial') if before_item else None)
+
         success, message = update_inventory_item(row_index, row_data)
 
         if not success:
@@ -81,6 +91,18 @@ def update_inventory():
         first_col = headers[0] if headers else 'Unknown'
         item_identifier = row_data.get(first_col, 'Unknown')
         create_inventory_backup(username, f'Updated item: {item_identifier}')
+
+        # Log the activity
+        log_activity(
+            username=username,
+            action_type='update',
+            target_type='inventory',
+            target_id=str(row_index),
+            serial=serial,
+            details=f'Updated inventory item: Serial {serial}',
+            before_data=dict(before_item) if before_item else None,
+            after_data=row_data
+        )
 
         return jsonify({'success': True, 'message': 'Inventory updated successfully'})
     except Exception as e:
@@ -95,6 +117,7 @@ def add_inventory():
     try:
         row_data = request.json.get('data')
         username = session.get('user')
+        serial = row_data.get('Serial', row_data.get('serial', ''))
 
         success, item_id = add_inventory_item(row_data)
 
@@ -106,6 +129,17 @@ def add_inventory():
         first_col = headers[0] if headers else 'Unknown'
         item_identifier = row_data.get(first_col, 'N/A')
         create_inventory_backup(username, f'Added item: {item_identifier}')
+
+        # Log the activity
+        log_activity(
+            username=username,
+            action_type='add',
+            target_type='inventory',
+            target_id=str(item_id),
+            serial=serial,
+            details=f'Added new inventory item: Serial {serial}',
+            after_data=row_data
+        )
 
         return jsonify({'success': True, 'message': 'Item added successfully'})
     except Exception as e:
@@ -121,16 +155,19 @@ def delete_inventory():
         row_index = request.json.get('row_index')
         username = session.get('user')
 
-        # Get item data before deleting for backup description
+        # Get item data before deleting for backup description and logging
         items = get_all_inventory_items()
-        deleted_item = None
+        deleted_item_data = None
         headers = get_inventory_headers()
         first_col = headers[0] if headers else 'Unknown'
 
         for item in items:
             if item.get('_row_index') == row_index:
-                deleted_item = item.get(first_col, 'N/A')
+                deleted_item_data = dict(item)
                 break
+
+        deleted_item = deleted_item_data.get(first_col, 'N/A') if deleted_item_data else 'N/A'
+        serial = deleted_item_data.get('Serial', '') if deleted_item_data else ''
 
         success, message = delete_inventory_item(row_index)
 
@@ -139,6 +176,17 @@ def delete_inventory():
 
         # Create backup after delete
         create_inventory_backup(username, f'Deleted item: {deleted_item}')
+
+        # Log the activity
+        log_activity(
+            username=username,
+            action_type='delete',
+            target_type='inventory',
+            target_id=str(row_index),
+            serial=serial,
+            details=f'Deleted inventory item: Serial {serial}',
+            before_data=deleted_item_data
+        )
 
         return jsonify({'success': True, 'message': 'Item deleted successfully'})
     except Exception as e:
@@ -171,6 +219,7 @@ def bulk_delete_inventory():
         # Delete each item
         deleted_count = 0
         deleted_serials = []
+        deleted_items_data = []
 
         for item in items_to_delete:
             row_index = item.get('_row_index')
@@ -180,6 +229,7 @@ def bulk_delete_inventory():
             if success:
                 deleted_count += 1
                 deleted_serials.append(serial)
+                deleted_items_data.append(dict(item))
 
         # Create backup after bulk delete
         summary = f'Bulk deleted {deleted_count} item(s): {", ".join(deleted_serials[:10])}'
@@ -187,6 +237,17 @@ def bulk_delete_inventory():
             summary += f' and {len(deleted_serials) - 10} more'
 
         create_inventory_backup(username, summary)
+
+        # Log each deleted item
+        for i, serial in enumerate(deleted_serials):
+            log_activity(
+                username=username,
+                action_type='delete',
+                target_type='inventory',
+                serial=serial,
+                details=f'Bulk deleted inventory item: Serial {serial}',
+                before_data=deleted_items_data[i] if i < len(deleted_items_data) else None
+            )
 
         return jsonify({
             'success': True,
@@ -209,18 +270,56 @@ def commit_batch():
         additions = request.json.get('additions', [])
         deletions = request.json.get('deletions', [])
 
+        # Get all items before changes for logging
+        all_items = get_all_inventory_items()
+        items_by_index = {item.get('_row_index'): item for item in all_items}
+
         # Process deletions
         for row_index in deletions:
+            before_item = items_by_index.get(row_index)
+            serial = before_item.get('Serial', '') if before_item else ''
             delete_inventory_item(row_index)
+            log_activity(
+                username=username,
+                action_type='delete',
+                target_type='inventory',
+                target_id=str(row_index),
+                serial=serial,
+                details=f'Deleted inventory item (batch): Serial {serial}',
+                before_data=dict(before_item) if before_item else None
+            )
 
         # Process modifications
         for row_index_str, changes in modifications.items():
             row_index = int(row_index_str)
+            before_item = items_by_index.get(row_index)
+            serial = changes.get('Serial', before_item.get('Serial', '') if before_item else '')
             update_inventory_item(row_index, changes)
+            log_activity(
+                username=username,
+                action_type='update',
+                target_type='inventory',
+                target_id=str(row_index),
+                serial=serial,
+                details=f'Updated inventory item (batch): Serial {serial}',
+                before_data=dict(before_item) if before_item else None,
+                after_data=changes
+            )
 
         # Process additions
         for new_row in additions:
-            add_inventory_item(new_row)
+            serial = new_row.get('Serial', new_row.get('serial', ''))
+            success, item_id = add_inventory_item(new_row)
+            if success:
+                log_activity(
+                    username=username,
+                    action_type='add',
+                    target_type='inventory',
+                    target_id=str(item_id),
+                    serial=serial,
+                    details=f'Added inventory item (batch): Serial {serial}',
+                    after_data=new_row
+                )
 
         # Create backup with summary
         total_changes = len(modifications) + len(additions) + len(deletions)
@@ -228,5 +327,187 @@ def commit_batch():
         create_inventory_backup(username, action_desc, changes_summary)
 
         return jsonify({'success': True, 'message': 'Batch committed successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@inventory_bp.route('/api/inventory/import-csv', methods=['POST'])
+@login_required
+@admin_required
+def import_csv():
+    """Import inventory and warranty data from CSV file (admin only)"""
+    try:
+        username = session.get('user')
+        password = request.form.get('password')
+        mode = request.form.get('mode', 'append')  # 'append' or 'replace'
+
+        # Verify password
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
+
+        success, message = verify_user_password(username, password)
+        if not success:
+            return jsonify({'error': 'Invalid password'}), 401
+
+        # Check for file
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'File must be a CSV'}), 400
+
+        # Read and parse CSV
+        try:
+            content = file.read().decode('utf-8')
+            csv_reader = csv.DictReader(io.StringIO(content))
+            rows = list(csv_reader)
+        except Exception as e:
+            return jsonify({'error': f'Failed to parse CSV: {str(e)}'}), 400
+
+        if not rows:
+            return jsonify({'error': 'CSV file is empty'}), 400
+
+        # Define valid inventory and warranty columns
+        inventory_columns = [
+            'market', 'registry', 'product', 'project_id', 'project_type',
+            'protocol', 'project_name', 'vintage', 'serial', 'is_custody',
+            'is_assigned', 'trade_id'
+        ]
+        warranty_columns = [
+            'buy_start', 'buy_end', 'sell_start', 'sell_end',
+            'buy_tradeid', 'sell_tradeid', 'buy_client', 'sell_client'
+        ]
+
+        # Normalize CSV headers (case-insensitive matching)
+        csv_headers = [h.strip() for h in csv_reader.fieldnames] if csv_reader.fieldnames else []
+        header_map = {}
+        for h in csv_headers:
+            h_lower = h.lower().replace(' ', '_')
+            # Check inventory columns
+            for col in inventory_columns:
+                if h_lower == col.lower():
+                    header_map[h] = col
+                    break
+            # Check warranty columns
+            for col in warranty_columns:
+                if h_lower == col.lower():
+                    header_map[h] = col
+                    break
+            # If no match, keep original (will be ignored for inventory)
+            if h not in header_map:
+                header_map[h] = h
+
+        # Create backup before import
+        create_inventory_backup(username, f'Pre-import backup (mode: {mode})')
+
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        # If replace mode, clear existing data
+        if mode == 'replace':
+            cursor.execute('DELETE FROM warranties')
+            cursor.execute('DELETE FROM inventory')
+            conn.commit()
+
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        imported_serials = []
+        skipped_serials = []
+
+        for i, row in enumerate(rows, start=2):  # Start at 2 to account for header row
+            try:
+                # Normalize row keys
+                normalized_row = {}
+                for key, value in row.items():
+                    if key in header_map:
+                        normalized_row[header_map[key]] = value.strip() if value else ''
+
+                # Check if serial exists (required field)
+                serial = normalized_row.get('serial', '')
+                if not serial:
+                    skipped_count += 1
+                    errors.append(f'Row {i}: Missing serial number')
+                    continue
+
+                # Build inventory data
+                inventory_data = {col: normalized_row.get(col, '') for col in inventory_columns if col in normalized_row}
+
+                # Check for existing serial in append mode
+                if mode == 'append':
+                    cursor.execute('SELECT id FROM inventory WHERE serial = ?', (serial,))
+                    existing = cursor.fetchone()
+                    if existing:
+                        skipped_count += 1
+                        skipped_serials.append(serial)
+                        errors.append(f'Row {i}: Serial {serial} already exists')
+                        continue
+
+                # Insert inventory record
+                inv_cols = list(inventory_data.keys())
+                inv_vals = [inventory_data[c] for c in inv_cols]
+
+                if inv_cols:
+                    placeholders = ', '.join(['?' for _ in inv_cols])
+                    cursor.execute(
+                        f'INSERT INTO inventory ({", ".join(inv_cols)}) VALUES ({placeholders})',
+                        inv_vals
+                    )
+
+                # Build and insert warranty data if any warranty columns present
+                warranty_data = {col: normalized_row.get(col, '') for col in warranty_columns if col in normalized_row and normalized_row.get(col, '')}
+
+                if warranty_data or serial:
+                    # Always create a warranty record for each inventory item
+                    warranty_data['serial'] = serial
+                    war_cols = list(warranty_data.keys())
+                    war_vals = [warranty_data[c] for c in war_cols]
+
+                    placeholders = ', '.join(['?' for _ in war_cols])
+                    cursor.execute(
+                        f'INSERT OR REPLACE INTO warranties ({", ".join(war_cols)}) VALUES ({placeholders})',
+                        war_vals
+                    )
+
+                imported_count += 1
+                imported_serials.append(serial)
+
+            except Exception as e:
+                skipped_count += 1
+                errors.append(f'Row {i}: {str(e)}')
+
+        conn.commit()
+        conn.close()
+
+        # Create post-import backup with detailed summary including serials
+        import_summary = {
+            'added': [{'Serial': s} for s in imported_serials],
+            'modified': [],
+            'deleted': [] if mode == 'append' else [{'Serial': 'All previous records replaced'}]
+        }
+        action_desc = f'CSV Import ({mode}): {imported_count} imported, {skipped_count} skipped'
+        create_inventory_backup(username, action_desc, import_summary)
+
+        # Log the import activity
+        log_activity(
+            username=username,
+            action_type='import',
+            target_type='inventory',
+            details=f'CSV Import ({mode}): {imported_count} items imported, {skipped_count} skipped',
+            after_data={'imported_serials': imported_serials[:50], 'total_imported': imported_count}
+        )
+
+        return jsonify({
+            'success': True,
+            'imported': imported_count,
+            'skipped': skipped_count,
+            'errors': errors[:20] if errors else [],  # Return first 20 errors
+            'total_errors': len(errors)
+        })
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500

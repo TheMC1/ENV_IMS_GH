@@ -516,6 +516,7 @@
                         {% endif %}
                         {% if user_role == 'admin' %}
                         <button class="btn-secondary" onclick="showBackups()">View Backups</button>
+                        <button class="btn-secondary" onclick="showImportCSV()">Import to Database</button>
                         {% endif %}
                         {% if user_role != 'ops' %}
                         <button class="btn-primary btn-add" onclick="addNewRow()">Add New Item</button>
@@ -657,6 +658,86 @@
                             <div id="backupGroupsContainer">
                                 <p style="text-align: center; color: #666;">Loading backups...</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Import CSV Modal -->
+            <div id="importCSVModal" class="modal">
+                <div class="modal-content" style="max-width: 650px;">
+                    <div class="modal-header">
+                        <h3>Import to Database</h3>
+                        <span class="close" onclick="closeImportCSV()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <p style="color: #666; margin-bottom: 20px;">
+                            Import inventory and warranty data from a CSV file. The CSV should contain column headers matching the database fields.
+                        </p>
+
+                        <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4 style="margin: 0; font-size: 14px; color: #495057;">Supported Columns:</h4>
+                                <button class="btn-primary" onclick="downloadCSVTemplate()" style="padding: 6px 12px; font-size: 12px;">Download Template</button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+                                <div>
+                                    <strong style="color: #28a745;">Inventory:</strong>
+                                    <div style="color: #666; margin-top: 5px;">
+                                        market, registry, product, project_id, project_type, protocol, project_name, vintage, serial, is_custody, is_assigned, trade_id
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong style="color: #007bff;">Warranty:</strong>
+                                    <div style="color: #666; margin-top: 5px;">
+                                        buy_start, buy_end, sell_start, sell_end, buy_tradeid, sell_tradeid, buy_client, sell_client
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #dee2e6; font-size: 12px; color: #6c757d;">
+                                <strong>Note:</strong> The <code>serial</code> column is required. Column names are case-insensitive.
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select CSV File:</label>
+                            <input type="file" id="csvFileInput" accept=".csv" style="width: 100%; padding: 10px; border: 2px dashed #dee2e6; border-radius: 8px; background: #f8f9fa; cursor: pointer;">
+                            <div id="csvFileInfo" style="margin-top: 8px; font-size: 13px; color: #666;"></div>
+                            <div id="csvValidationResult" style="margin-top: 8px; display: none;"></div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Import Mode:</label>
+                            <div style="display: flex; gap: 20px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 16px; border: 2px solid #dee2e6; border-radius: 8px; flex: 1; transition: all 0.2s;">
+                                    <input type="radio" name="importMode" value="append" checked onchange="updateImportModeStyle()">
+                                    <div>
+                                        <div style="font-weight: 600; color: #28a745;">Append</div>
+                                        <div style="font-size: 12px; color: #666;">Add new records, skip existing serials</div>
+                                    </div>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 16px; border: 2px solid #dee2e6; border-radius: 8px; flex: 1; transition: all 0.2s;">
+                                    <input type="radio" name="importMode" value="replace" onchange="updateImportModeStyle()">
+                                    <div>
+                                        <div style="font-weight: 600; color: #dc3545;">Replace All</div>
+                                        <div style="font-size: 12px; color: #666;">Delete all existing data first</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #856404;">
+                                Enter Your Password to Confirm:
+                            </label>
+                            <input type="password" id="importPassword" placeholder="Enter your password" style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;">
+                        </div>
+
+                        <div id="importResultContainer" style="display: none; margin-bottom: 20px;"></div>
+
+                        <div class="form-actions" style="justify-content: flex-end; gap: 10px;">
+                            <button class="btn-secondary" onclick="closeImportCSV()">Cancel</button>
+                            <button class="btn-commit" id="importCSVBtn" onclick="executeCSVImport()">Import</button>
                         </div>
                     </div>
                 </div>
@@ -2398,6 +2479,8 @@
             for (const [rowIndex, changes] of Object.entries(pendingChanges.modified)) {
                 const originalRow = inventoryData.find(r => r._row_index == rowIndex);
                 const itemId = getItemIdentifier(originalRow);
+                // Get Serial from original row
+                const serial = originalRow ? (originalRow['Serial'] || originalRow['serial'] || '') : '';
 
                 const changeDetails = {};
                 for (const [field, newValue] of Object.entries(changes)) {
@@ -2407,6 +2490,7 @@
 
                 summary.modified.push({
                     itemId: itemId,
+                    Serial: serial,
                     changes: changeDetails
                 });
             }
@@ -2424,6 +2508,8 @@
             pendingChanges.deleted.forEach(rowIndex => {
                 const originalRow = inventoryData.find(r => r._row_index === rowIndex);
                 const itemId = getItemIdentifier(originalRow);
+                // Get Serial from original row
+                const serial = originalRow ? (originalRow['Serial'] || originalRow['serial'] || '') : '';
                 const itemData = {};
                 if (originalRow) {
                     headers.forEach(h => {
@@ -2432,6 +2518,7 @@
                 }
                 summary.deleted.push({
                     itemId: itemId,
+                    Serial: serial,
                     data: itemData
                 });
             });
@@ -2639,8 +2726,15 @@
 
                 container.innerHTML = '';
 
-                // Render each date group
-                for (const [date, backups] of Object.entries(data.grouped)) {
+                // Get dates and sort newest first (Object.entries may not preserve order)
+                const sortedDates = Object.keys(data.grouped).sort((a, b) => {
+                    // Sort by date string descending (newest first)
+                    return b.localeCompare(a);
+                });
+
+                // Render each date group in sorted order
+                for (const date of sortedDates) {
+                    const backups = data.grouped[date];
                     const groupDiv = document.createElement('div');
                     groupDiv.className = 'backup-group';
 
@@ -2827,18 +2921,33 @@
             title.textContent = `Change Summary - ${date}`;
             content.innerHTML = '';
 
+            // Helper to get Serial from item (handles different summary structures)
+            function getSerialFromItem(item) {
+                // Check direct Serial property first
+                if (item.Serial) return item.Serial;
+                if (item.serial) return item.serial;
+                // Check nested data object (for deleted items in old format)
+                if (item.data) {
+                    if (item.data.Serial) return item.data.Serial;
+                    if (item.data.serial) return item.data.serial;
+                }
+                // Fallback
+                return 'Unknown';
+            }
+
             // Show modified items
             if (summary.modified && summary.modified.length > 0) {
                 summary.modified.forEach(item => {
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'summary-item modified';
 
-                    const changedFields = Object.entries(item.changes).map(([field, values]) => {
+                    const serial = getSerialFromItem(item);
+                    const changedFields = Object.entries(item.changes || {}).map(([field, values]) => {
                         return `<strong>${field}:</strong> "${values.old}" → "${values.new}"`;
                     }).join('<br>');
 
                     itemDiv.innerHTML = `
-                        <div class="summary-item-title">Modified: ${item.itemId}</div>
+                        <div class="summary-item-title">Modified - Serial: ${serial}</div>
                         <div class="summary-item-details">${changedFields}</div>
                     `;
                     content.appendChild(itemDiv);
@@ -2851,17 +2960,18 @@
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'summary-item added';
 
-                    const fields = Object.entries(item).map(([field, value]) => {
-                        return `<strong>${field}:</strong> "${value}"`;
-                    }).join('<br>');
+                    const serial = getSerialFromItem(item);
 
-                    // Use first field as identifier
-                    const firstField = Object.keys(item)[0];
-                    const itemId = item[firstField] || 'Unknown';
+                    // Show all fields except Serial (already in title)
+                    const fields = Object.entries(item)
+                        .filter(([field]) => field.toLowerCase() !== 'serial')
+                        .map(([field, value]) => {
+                            return `<strong>${field}:</strong> "${value}"`;
+                        }).join('<br>');
 
                     itemDiv.innerHTML = `
-                        <div class="summary-item-title">Added: ${itemId}</div>
-                        <div class="summary-item-details">${fields}</div>
+                        <div class="summary-item-title">Added - Serial: ${serial}</div>
+                        <div class="summary-item-details">${fields || 'No additional details'}</div>
                     `;
                     content.appendChild(itemDiv);
                 });
@@ -2873,13 +2983,19 @@
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'summary-item deleted';
 
-                    const fields = Object.entries(item.data).map(([field, value]) => {
-                        return `<strong>${field}:</strong> "${value}"`;
-                    }).join('<br>');
+                    // Handle both old format (item.data) and new format (direct item object)
+                    const itemData = item.data || item;
+                    const serial = itemData.Serial || itemData.serial || item.itemId || 'Unknown';
+
+                    const fields = Object.entries(itemData)
+                        .filter(([field]) => field.toLowerCase() !== 'serial' && field !== 'itemId')
+                        .map(([field, value]) => {
+                            return `<strong>${field}:</strong> "${value}"`;
+                        }).join('<br>');
 
                     itemDiv.innerHTML = `
-                        <div class="summary-item-title">Deleted: ${item.itemId}</div>
-                        <div class="summary-item-details">${fields}</div>
+                        <div class="summary-item-title">Deleted - Serial: ${serial}</div>
+                        <div class="summary-item-details">${fields || 'No additional details'}</div>
                     `;
                     content.appendChild(itemDiv);
                 });
@@ -3113,6 +3229,349 @@
                 }
             );
         }
+
+        // =====================================================================
+        // CSV Import Functions (Admin Only)
+        // =====================================================================
+
+        const CSV_INVENTORY_COLUMNS = ['market', 'registry', 'product', 'project_id', 'project_type', 'protocol', 'project_name', 'vintage', 'serial', 'is_custody', 'is_assigned', 'trade_id'];
+        const CSV_WARRANTY_COLUMNS = ['buy_start', 'buy_end', 'sell_start', 'sell_end', 'buy_tradeid', 'sell_tradeid', 'buy_client', 'sell_client'];
+        const CSV_ALL_COLUMNS = [...CSV_INVENTORY_COLUMNS, ...CSV_WARRANTY_COLUMNS];
+
+        // Data type definitions for validation
+        const CSV_COLUMN_TYPES = {
+            'is_assigned': 'integer',
+            'buy_tradeid': 'integer',
+            'sell_tradeid': 'integer',
+            'buy_start': 'date',
+            'buy_end': 'date',
+            'sell_start': 'date',
+            'sell_end': 'date'
+        };
+
+        function showImportCSV() {
+            document.getElementById('importCSVModal').style.display = 'flex';
+            document.getElementById('csvFileInput').value = '';
+            document.getElementById('csvFileInfo').textContent = '';
+            document.getElementById('csvValidationResult').style.display = 'none';
+            document.getElementById('csvValidationResult').innerHTML = '';
+            document.getElementById('importPassword').value = '';
+            document.getElementById('importResultContainer').style.display = 'none';
+            document.getElementById('importResultContainer').innerHTML = '';
+            document.querySelector('input[name="importMode"][value="append"]').checked = true;
+            updateImportModeStyle();
+
+            // Add file input change listener with validation
+            document.getElementById('csvFileInput').onchange = async function(e) {
+                const file = e.target.files[0];
+                const validationDiv = document.getElementById('csvValidationResult');
+
+                if (file) {
+                    const sizeKB = (file.size / 1024).toFixed(1);
+                    document.getElementById('csvFileInfo').innerHTML =
+                        `<span style="color: #28a745;">Selected:</span> ${file.name} (${sizeKB} KB)`;
+
+                    // Validate CSV
+                    validationDiv.style.display = 'block';
+                    validationDiv.innerHTML = '<span style="color: #666;">Validating CSV...</span>';
+
+                    try {
+                        const validationResult = await validateCSVFile(file);
+                        if (validationResult.valid) {
+                            validationDiv.innerHTML = `
+                                <div style="padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
+                                    <strong>Valid CSV</strong> - ${validationResult.rowCount} data rows found
+                                    <div style="font-size: 12px; margin-top: 5px;">Columns: ${validationResult.matchedColumns.join(', ')}</div>
+                                </div>
+                            `;
+                        } else {
+                            validationDiv.innerHTML = `
+                                <div style="padding: 10px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24;">
+                                    <strong>Validation Errors:</strong>
+                                    <ul style="margin: 5px 0 0 20px; padding: 0;">
+                                        ${validationResult.errors.map(e => `<li>${e}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            `;
+                        }
+                    } catch (error) {
+                        validationDiv.innerHTML = `
+                            <div style="padding: 10px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24;">
+                                <strong>Error reading file:</strong> ${error.message}
+                            </div>
+                        `;
+                    }
+                } else {
+                    document.getElementById('csvFileInfo').textContent = '';
+                    validationDiv.style.display = 'none';
+                }
+            };
+        }
+
+        function closeImportCSV() {
+            document.getElementById('importCSVModal').style.display = 'none';
+        }
+
+        function downloadCSVTemplate() {
+            const headers = CSV_ALL_COLUMNS.join(',');
+            const exampleRow = 'VCM,Verra,VCU,VCS-123,REDD+,VM0015,Sample Forest Project,2023,SERIAL-001,Yes,0,,2024-01-01,2024-12-31,,,,,';
+            const csvContent = headers + '\n' + exampleRow;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'inventory_import_template.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function validateCSVFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const content = e.target.result;
+                        const lines = content.split(/\r?\n/).filter(line => line.trim());
+
+                        if (lines.length === 0) {
+                            resolve({ valid: false, errors: ['CSV file is empty'] });
+                            return;
+                        }
+
+                        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+                        const errors = [];
+                        const matchedColumns = [];
+
+                        // Check for serial column (required)
+                        if (!headers.includes('serial')) {
+                            errors.push('Missing required column: serial');
+                        }
+
+                        // Match columns
+                        headers.forEach(h => {
+                            if (CSV_ALL_COLUMNS.map(c => c.toLowerCase()).includes(h)) {
+                                matchedColumns.push(h);
+                            }
+                        });
+
+                        if (matchedColumns.length === 0) {
+                            errors.push('No recognized columns found. Check column names.');
+                        }
+
+                        // Validate data types in rows
+                        const dataRows = lines.slice(1);
+                        let typeErrors = [];
+
+                        dataRows.forEach((line, rowIndex) => {
+                            if (!line.trim()) return;
+
+                            const values = parseCSVLine(line);
+
+                            headers.forEach((header, colIndex) => {
+                                const value = values[colIndex] || '';
+                                if (!value.trim()) return; // Skip empty values
+
+                                const expectedType = CSV_COLUMN_TYPES[header];
+                                if (expectedType) {
+                                    const typeError = validateDataType(value, expectedType, header, rowIndex + 2);
+                                    if (typeError) {
+                                        typeErrors.push(typeError);
+                                    }
+                                }
+                            });
+                        });
+
+                        // Only show first 5 type errors
+                        if (typeErrors.length > 0) {
+                            errors.push(...typeErrors.slice(0, 5));
+                            if (typeErrors.length > 5) {
+                                errors.push(`...and ${typeErrors.length - 5} more type errors`);
+                            }
+                        }
+
+                        resolve({
+                            valid: errors.length === 0,
+                            errors: errors,
+                            rowCount: dataRows.filter(r => r.trim()).length,
+                            matchedColumns: matchedColumns
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsText(file);
+            });
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
+        function validateDataType(value, expectedType, columnName, rowNumber) {
+            value = value.replace(/"/g, '').trim();
+
+            switch (expectedType) {
+                case 'integer':
+                    if (value && !/^-?\d+$/.test(value)) {
+                        return `Row ${rowNumber}, ${columnName}: Expected integer, got "${value}"`;
+                    }
+                    break;
+                case 'date':
+                    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value) && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value) && !/^\d{1,2}-\d{1,2}-\d{4}$/.test(value)) {
+                        return `Row ${rowNumber}, ${columnName}: Expected date format (YYYY-MM-DD), got "${value}"`;
+                    }
+                    break;
+            }
+            return null;
+        }
+
+        function updateImportModeStyle() {
+            const appendLabel = document.querySelector('input[name="importMode"][value="append"]').closest('label');
+            const replaceLabel = document.querySelector('input[name="importMode"][value="replace"]').closest('label');
+            const appendSelected = document.querySelector('input[name="importMode"][value="append"]').checked;
+
+            if (appendSelected) {
+                appendLabel.style.borderColor = '#28a745';
+                appendLabel.style.background = '#d4edda';
+                replaceLabel.style.borderColor = '#dee2e6';
+                replaceLabel.style.background = 'white';
+            } else {
+                appendLabel.style.borderColor = '#dee2e6';
+                appendLabel.style.background = 'white';
+                replaceLabel.style.borderColor = '#dc3545';
+                replaceLabel.style.background = '#f8d7da';
+            }
+        }
+
+        async function executeCSVImport() {
+            const fileInput = document.getElementById('csvFileInput');
+            const password = document.getElementById('importPassword').value;
+            const mode = document.querySelector('input[name="importMode"]:checked').value;
+            const resultContainer = document.getElementById('importResultContainer');
+            const importBtn = document.getElementById('importCSVBtn');
+
+            // Validation
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showAlert('Please select a CSV file', 'warning');
+                return;
+            }
+
+            if (!password) {
+                showAlert('Please enter your password to confirm the import', 'warning');
+                return;
+            }
+
+            const file = fileInput.files[0];
+
+            // Confirm for replace mode
+            if (mode === 'replace') {
+                const confirmed = await new Promise(resolve => {
+                    showConfirm(
+                        'WARNING: Replace mode will DELETE ALL existing inventory and warranty data before importing. This action cannot be undone. Are you sure you want to proceed?',
+                        () => resolve(true),
+                        () => resolve(false)
+                    );
+                });
+
+                if (!confirmed) {
+                    return;
+                }
+            }
+
+            // Show loading state
+            importBtn.disabled = true;
+            importBtn.textContent = 'Importing...';
+            resultContainer.style.display = 'block';
+            resultContainer.innerHTML = '<div style="text-align: center; color: #666;"><span style="display: inline-block; width: 20px; height: 20px; border: 2px solid #007bff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span> Processing CSV file...</div>';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('password', password);
+                formData.append('mode', mode);
+
+                const response = await fetch('/api/inventory/import-csv', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    resultContainer.innerHTML = `
+                        <div style="padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; color: #721c24;">
+                            <strong>Error:</strong> ${result.error}
+                        </div>
+                    `;
+                } else {
+                    let html = `
+                        <div style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; color: #155724;">
+                            <strong>Import Complete!</strong><br>
+                            <div style="margin-top: 10px;">
+                                <span style="color: #28a745;">Imported: ${result.imported}</span> |
+                                <span style="color: #856404;">Skipped: ${result.skipped}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    if (result.errors && result.errors.length > 0) {
+                        html += `
+                            <div style="margin-top: 10px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+                                <strong style="color: #856404;">Errors (${result.total_errors}):</strong>
+                                <div style="max-height: 150px; overflow-y: auto; margin-top: 8px; font-size: 12px; color: #856404;">
+                                    ${result.errors.map(e => `<div>${e}</div>`).join('')}
+                                    ${result.total_errors > 20 ? `<div style="font-style: italic;">...and ${result.total_errors - 20} more</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    resultContainer.innerHTML = html;
+
+                    // Reload inventory data
+                    await loadInventory();
+                    showAlert(`Successfully imported ${result.imported} record(s)`, 'success');
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                resultContainer.innerHTML = `
+                    <div style="padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; color: #721c24;">
+                        <strong>Error:</strong> Failed to import CSV. Please try again.
+                    </div>
+                `;
+            } finally {
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import';
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const importModal = document.getElementById('importCSVModal');
+            if (event.target === importModal) {
+                closeImportCSV();
+            }
+        });
     </script>
     <script>
         (function() {

@@ -92,12 +92,31 @@ def init_database():
         )
     ''')
 
+    # Create activity_logs table for tracking all user actions
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_id TEXT,
+            serial TEXT,
+            details TEXT,
+            before_data TEXT,
+            after_data TEXT,
+            is_reverted INTEGER DEFAULT 0,
+            reverted_by TEXT,
+            reverted_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Initialize default role permissions if not exist
     default_permissions = {
-        'admin': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'users', 'settings', 'backups'],
-        'trader': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'settings'],
-        'ops': ['dashboard', 'inventory', 'warranties', 'reports', 'settings'],
-        'user': ['dashboard', 'inventory', 'warranties', 'reports', 'settings']
+        'admin': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'users', 'settings', 'backups', 'logs'],
+        'trader': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'settings', 'logs'],
+        'ops': ['dashboard', 'inventory', 'warranties', 'reports', 'settings', 'logs'],
+        'user': ['dashboard', 'inventory', 'warranties', 'reports', 'settings', 'logs']
     }
 
     for role, pages in default_permissions.items():
@@ -731,17 +750,27 @@ def delete_inventory_item(item_id):
         return False, str(e)
 
 def create_inventory_backup(username, action, summary=None):
-    """Create a backup snapshot of the entire inventory"""
+    """Create a backup snapshot of the entire inventory including warranties"""
     try:
         # Get all current inventory data
         items = get_all_inventory_items()
 
+        # Get all warranty data
         conn = get_inventory_db_connection()
         cursor = conn.cursor()
+        cursor.execute("SELECT * FROM warranties")
+        warranty_rows = cursor.fetchall()
+        warranties = [dict(row) for row in warranty_rows]
+
+        # Combine inventory and warranty data
+        backup_data = {
+            'inventory': items,
+            'warranties': warranties
+        }
 
         cursor.execute(
             "INSERT INTO inventory_backups (username, action, summary, backup_data) VALUES (?, ?, ?, ?)",
-            (username, action, json.dumps(summary) if summary else None, json.dumps(items))
+            (username, action, json.dumps(summary) if summary else None, json.dumps(backup_data))
         )
 
         conn.commit()
@@ -778,7 +807,7 @@ def get_all_inventory_backups():
         return []
 
 def restore_inventory_backup(backup_id):
-    """Restore inventory from a backup snapshot"""
+    """Restore inventory and warranties from a backup snapshot"""
     try:
         conn = get_inventory_db_connection()
         cursor = conn.cursor()
@@ -791,12 +820,23 @@ def restore_inventory_backup(backup_id):
             conn.close()
             return False, "Backup not found"
 
-        backup_items = json.loads(row['backup_data'])
+        backup_data = json.loads(row['backup_data'])
 
-        # Clear current inventory
+        # Handle both old format (list) and new format (dict with inventory/warranties)
+        if isinstance(backup_data, list):
+            # Old format - just inventory items
+            backup_items = backup_data
+            backup_warranties = []
+        else:
+            # New format - dict with inventory and warranties
+            backup_items = backup_data.get('inventory', [])
+            backup_warranties = backup_data.get('warranties', [])
+
+        # Clear current inventory and warranties
+        cursor.execute("DELETE FROM warranties")
         cursor.execute("DELETE FROM inventory")
 
-        # Restore items from backup
+        # Restore inventory items from backup
         for item in backup_items:
             clean_data = {k: v for k, v in item.items() if k != '_row_index'}
             # Handle IsAssigned - convert string to integer
@@ -821,6 +861,27 @@ def restore_inventory_backup(backup_id):
                 is_assigned,
                 clean_data.get('TradeID', '')
             ))
+
+        # Restore warranty items from backup
+        for warranty in backup_warranties:
+            # Skip internal fields
+            clean_warranty = {k: v for k, v in warranty.items() if k not in ['id', 'created_at', 'updated_at']}
+            if clean_warranty.get('serial'):
+                cursor.execute("""
+                    INSERT INTO warranties (serial, buy_start, buy_end, sell_start, sell_end,
+                                          buy_tradeid, sell_tradeid, buy_client, sell_client)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    clean_warranty.get('serial', ''),
+                    clean_warranty.get('buy_start', ''),
+                    clean_warranty.get('buy_end', ''),
+                    clean_warranty.get('sell_start', ''),
+                    clean_warranty.get('sell_end', ''),
+                    clean_warranty.get('buy_tradeid'),
+                    clean_warranty.get('sell_tradeid'),
+                    clean_warranty.get('buy_client', ''),
+                    clean_warranty.get('sell_client', '')
+                ))
 
         conn.commit()
         conn.close()
@@ -1519,13 +1580,289 @@ def get_available_pages():
         {'id': 'reports', 'name': 'Reports', 'description': 'View reports and statistics'},
         {'id': 'settings', 'name': 'Settings', 'description': 'User settings and preferences'},
         {'id': 'users', 'name': 'User Management', 'description': 'Manage users (admin only)'},
-        {'id': 'backups', 'name': 'Backups', 'description': 'System backups (admin only)'}
+        {'id': 'backups', 'name': 'Backups', 'description': 'System backups (admin only)'},
+        {'id': 'logs', 'name': 'Activity Logs', 'description': 'View system activity logs'}
     ]
 
 
 def get_available_roles():
     """Get list of available roles"""
     return ['admin', 'trader', 'ops', 'user']
+
+
+# =============================================================================
+# ACTIVITY LOGGING FUNCTIONS
+# =============================================================================
+
+def log_activity(username, action_type, target_type, target_id=None, serial=None,
+                 details=None, before_data=None, after_data=None):
+    """
+    Log an activity to the activity_logs table.
+
+    Args:
+        username: The user performing the action
+        action_type: Type of action (add, update, delete, import, restore, login, etc.)
+        target_type: Type of target (inventory, warranty, user, backup, system)
+        target_id: ID of the target record (optional)
+        serial: Serial number if applicable (optional)
+        details: Human-readable description of the action
+        before_data: JSON string of data before the change (optional)
+        after_data: JSON string of data after the change (optional)
+
+    Returns:
+        (success, log_id or error_message)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO activity_logs
+            (username, action_type, target_type, target_id, serial, details, before_data, after_data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            username,
+            action_type,
+            target_type,
+            target_id,
+            serial,
+            details,
+            json.dumps(before_data) if before_data else None,
+            json.dumps(after_data) if after_data else None
+        ))
+
+        conn.commit()
+        log_id = cursor.lastrowid
+        conn.close()
+
+        return True, log_id
+    except Exception as e:
+        return False, str(e)
+
+
+def get_activity_logs(filters=None, limit=500, offset=0):
+    """
+    Get activity logs with optional filtering.
+
+    Args:
+        filters: Dict with optional keys: username, action_type, target_type,
+                 date_from, date_to, serial, is_reverted
+        limit: Maximum number of records to return
+        offset: Number of records to skip
+
+    Returns:
+        List of activity log records
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM activity_logs WHERE 1=1"
+        params = []
+
+        if filters:
+            if filters.get('username'):
+                query += " AND username = ?"
+                params.append(filters['username'])
+            if filters.get('action_type'):
+                query += " AND action_type = ?"
+                params.append(filters['action_type'])
+            if filters.get('target_type'):
+                query += " AND target_type = ?"
+                params.append(filters['target_type'])
+            if filters.get('date_from'):
+                query += " AND date(created_at) >= date(?)"
+                params.append(filters['date_from'])
+            if filters.get('date_to'):
+                query += " AND date(created_at) <= date(?)"
+                params.append(filters['date_to'])
+            if filters.get('serial'):
+                query += " AND serial LIKE ?"
+                params.append(f"%{filters['serial']}%")
+            if filters.get('is_reverted') is not None:
+                query += " AND is_reverted = ?"
+                params.append(1 if filters['is_reverted'] else 0)
+
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        cursor.execute(query, params)
+        logs = cursor.fetchall()
+        conn.close()
+
+        result = []
+        for log in logs:
+            log_dict = dict(log)
+            # Parse JSON fields
+            if log_dict.get('before_data'):
+                try:
+                    log_dict['before_data'] = json.loads(log_dict['before_data'])
+                except:
+                    pass
+            if log_dict.get('after_data'):
+                try:
+                    log_dict['after_data'] = json.loads(log_dict['after_data'])
+                except:
+                    pass
+            result.append(log_dict)
+
+        return result
+    except Exception as e:
+        print(f"Error getting activity logs: {e}")
+        return []
+
+
+def get_activity_log_by_id(log_id):
+    """Get a specific activity log by ID"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM activity_logs WHERE id = ?", (log_id,))
+        log = cursor.fetchone()
+        conn.close()
+
+        if log:
+            log_dict = dict(log)
+            if log_dict.get('before_data'):
+                try:
+                    log_dict['before_data'] = json.loads(log_dict['before_data'])
+                except:
+                    pass
+            if log_dict.get('after_data'):
+                try:
+                    log_dict['after_data'] = json.loads(log_dict['after_data'])
+                except:
+                    pass
+            return log_dict
+        return None
+    except Exception as e:
+        print(f"Error getting activity log: {e}")
+        return None
+
+
+def mark_activity_reverted(log_id, reverted_by):
+    """Mark an activity log as reverted"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE activity_logs
+            SET is_reverted = 1, reverted_by = ?, reverted_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (reverted_by, log_id))
+
+        conn.commit()
+        affected = cursor.rowcount
+        conn.close()
+
+        return affected > 0
+    except Exception as e:
+        print(f"Error marking activity as reverted: {e}")
+        return False
+
+
+def clear_activity_reverted(log_id):
+    """Clear the reverted status of an activity log (for redo)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE activity_logs
+            SET is_reverted = 0, reverted_by = NULL, reverted_at = NULL
+            WHERE id = ?
+        """, (log_id,))
+
+        conn.commit()
+        affected = cursor.rowcount
+        conn.close()
+
+        return affected > 0
+    except Exception as e:
+        print(f"Error clearing activity reverted status: {e}")
+        return False
+
+
+def get_activity_log_stats():
+    """Get statistics about activity logs"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get counts by action type
+        cursor.execute("""
+            SELECT action_type, COUNT(*) as count
+            FROM activity_logs
+            GROUP BY action_type
+        """)
+        action_counts = {row['action_type']: row['count'] for row in cursor.fetchall()}
+
+        # Get counts by target type
+        cursor.execute("""
+            SELECT target_type, COUNT(*) as count
+            FROM activity_logs
+            GROUP BY target_type
+        """)
+        target_counts = {row['target_type']: row['count'] for row in cursor.fetchall()}
+
+        # Get counts by user
+        cursor.execute("""
+            SELECT username, COUNT(*) as count
+            FROM activity_logs
+            GROUP BY username
+            ORDER BY count DESC
+            LIMIT 10
+        """)
+        user_counts = {row['username']: row['count'] for row in cursor.fetchall()}
+
+        # Get total count
+        cursor.execute("SELECT COUNT(*) as total FROM activity_logs")
+        total = cursor.fetchone()['total']
+
+        # Get reverted count
+        cursor.execute("SELECT COUNT(*) as reverted FROM activity_logs WHERE is_reverted = 1")
+        reverted = cursor.fetchone()['reverted']
+
+        conn.close()
+
+        return {
+            'total': total,
+            'reverted': reverted,
+            'by_action': action_counts,
+            'by_target': target_counts,
+            'by_user': user_counts
+        }
+    except Exception as e:
+        print(f"Error getting activity stats: {e}")
+        return {}
+
+
+def get_distinct_log_values():
+    """Get distinct values for filter dropdowns"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT DISTINCT username FROM activity_logs ORDER BY username")
+        usernames = [row['username'] for row in cursor.fetchall()]
+
+        cursor.execute("SELECT DISTINCT action_type FROM activity_logs ORDER BY action_type")
+        action_types = [row['action_type'] for row in cursor.fetchall()]
+
+        cursor.execute("SELECT DISTINCT target_type FROM activity_logs ORDER BY target_type")
+        target_types = [row['target_type'] for row in cursor.fetchall()]
+
+        conn.close()
+
+        return {
+            'usernames': usernames,
+            'action_types': action_types,
+            'target_types': target_types
+        }
+    except Exception as e:
+        print(f"Error getting distinct log values: {e}")
+        return {'usernames': [], 'action_types': [], 'target_types': []}
 
 
 if __name__ == '__main__':

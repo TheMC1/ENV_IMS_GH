@@ -11,7 +11,8 @@ from database import (
     add_warranty_item,
     update_warranty_item,
     delete_warranty_item,
-    get_user_page_settings
+    get_user_page_settings,
+    log_activity
 )
 
 warranties_bp = Blueprint('warranties', __name__)
@@ -70,9 +71,15 @@ def update_warranty():
     try:
         row_index = request.json.get('row_index')
         updates = request.json.get('updates')
+        username = session.get('user')
 
         if row_index is None or not updates:
             return jsonify({'error': 'Missing row_index or updates'}), 400
+
+        # Get before data for logging
+        items = get_all_warranty_items()
+        before_item = next((item for item in items if item.get('_row_index') == row_index), None)
+        serial = before_item.get('Serial', '') if before_item else updates.get('Serial', '')
 
         # Only allow updates to warranty fields
         warranty_updates = {
@@ -89,6 +96,17 @@ def update_warranty():
         success, message = update_warranty_item(row_index, warranty_updates)
 
         if success:
+            # Log the activity
+            log_activity(
+                username=username,
+                action_type='update',
+                target_type='warranty',
+                target_id=str(row_index),
+                serial=serial,
+                details=f'Updated warranty: Serial {serial}',
+                before_data=dict(before_item) if before_item else None,
+                after_data=warranty_updates
+            )
             return jsonify({'success': True, 'message': 'Warranty updated successfully'})
         else:
             return jsonify({'error': message}), 500
@@ -103,13 +121,26 @@ def add_warranty():
     """Add a new warranty item"""
     try:
         item_data = request.json.get('item')
+        username = session.get('user')
 
         if not item_data:
             return jsonify({'error': 'Missing item data'}), 400
 
+        serial = item_data.get('Serial', '')
+
         success, item_id = add_warranty_item(item_data)
 
         if success:
+            # Log the activity
+            log_activity(
+                username=username,
+                action_type='add',
+                target_type='warranty',
+                target_id=str(item_id),
+                serial=serial,
+                details=f'Added new warranty: Serial {serial}',
+                after_data=item_data
+            )
             return jsonify({'success': True, 'item_id': item_id})
         else:
             return jsonify({'error': item_id}), 500
@@ -124,13 +155,29 @@ def delete_warranty():
     """Delete a warranty item"""
     try:
         row_index = request.json.get('row_index')
+        username = session.get('user')
 
         if row_index is None:
             return jsonify({'error': 'Missing row_index'}), 400
 
+        # Get before data for logging
+        items = get_all_warranty_items()
+        before_item = next((item for item in items if item.get('_row_index') == row_index), None)
+        serial = before_item.get('Serial', '') if before_item else ''
+
         success, message = delete_warranty_item(row_index)
 
         if success:
+            # Log the activity
+            log_activity(
+                username=username,
+                action_type='delete',
+                target_type='warranty',
+                target_id=str(row_index),
+                serial=serial,
+                details=f'Deleted warranty: Serial {serial}',
+                before_data=dict(before_item) if before_item else None
+            )
             return jsonify({'success': True, 'message': 'Warranty deleted successfully'})
         else:
             return jsonify({'error': message}), 500
@@ -144,17 +191,34 @@ def delete_warranty():
 def commit_warranties_batch():
     """Commit a batch of warranty changes"""
     try:
+        username = session.get('user')
         modified = request.json.get('modified', {})
         added = request.json.get('added', [])
         deleted = request.json.get('deleted', [])
 
+        # Get all items for logging before changes
+        all_items = get_all_warranty_items()
+
         # Process deletions
         for row_index in deleted:
+            before_item = next((item for item in all_items if item.get('_row_index') == row_index), None)
+            serial = before_item.get('Serial', '') if before_item else ''
             delete_warranty_item(row_index)
+            log_activity(
+                username=username,
+                action_type='delete',
+                target_type='warranty',
+                target_id=str(row_index),
+                serial=serial,
+                details=f'Deleted warranty (batch): Serial {serial}',
+                before_data=dict(before_item) if before_item else None
+            )
 
         # Process modifications
         for row_index_str, updates in modified.items():
             row_index = int(row_index_str)
+            before_item = next((item for item in all_items if item.get('_row_index') == row_index), None)
+            serial = before_item.get('Serial', '') if before_item else ''
             warranty_updates = {
                 'Buy_Start': updates.get('Buy_Start', ''),
                 'Buy_End': updates.get('Buy_End', ''),
@@ -166,10 +230,31 @@ def commit_warranties_batch():
                 'Sell_Client': updates.get('Sell_Client', '')
             }
             update_warranty_item(row_index, warranty_updates)
+            log_activity(
+                username=username,
+                action_type='update',
+                target_type='warranty',
+                target_id=str(row_index),
+                serial=serial,
+                details=f'Updated warranty (batch): Serial {serial}',
+                before_data=dict(before_item) if before_item else None,
+                after_data=warranty_updates
+            )
 
         # Process additions
         for item_data in added:
-            add_warranty_item(item_data)
+            serial = item_data.get('Serial', '')
+            success, item_id = add_warranty_item(item_data)
+            if success:
+                log_activity(
+                    username=username,
+                    action_type='add',
+                    target_type='warranty',
+                    target_id=str(item_id),
+                    serial=serial,
+                    details=f'Added warranty (batch): Serial {serial}',
+                    after_data=item_data
+                )
 
         return jsonify({'success': True, 'message': 'Batch committed successfully'})
     except Exception as e:
