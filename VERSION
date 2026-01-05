@@ -1,6 +1,6 @@
 Carbon IMS - Inventory Management System
-Version: 1.0.0
-Release Date: December 22, 2025
+Version: 2.0.0
+Release Date: January 4, 2026
 Created By: Mike Cheung
 
 Build Information:
@@ -9,6 +9,17 @@ Build Information:
 - Database: SQLite3
 
 Change Log:
+
+v2.0.0 (January 4, 2026)
+- Trade Criteria & Generic Allocation system
+- Locate Inventory modal with availability checking
+- Criteria-specific assignment tracking with snapshot restoration
+- Draggable modals across all pages
+- FIFO ordering for criteria claims
+- Auto-restore criteria on unassign
+- Improved reports page
+
+v1.0.0 (December 22, 2025)
 - Initial release
 - User management with role-based access
 - Inventory management with CRUD operations

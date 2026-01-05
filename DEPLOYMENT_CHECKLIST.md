@@ -16,6 +16,7 @@ Copy the entire `IMS` folder containing:
 ### Required Files
 - [ ] `app.py` - Main application
 - [ ] `database.py` - Database functions
+- [ ] `trades_data.py` - Trades data configuration
 - [ ] `requirements.txt` - Dependencies
 - [ ] `init_databases.py` - Database initialization
 - [ ] `setup.bat` / `setup.sh` - Setup scripts
@@ -65,6 +66,8 @@ Copy the entire `IMS` folder containing:
 ### Test Navigation
 - [ ] "Inventory Management" page loads
 - [ ] "Warranties" page loads
+- [ ] "Trades" page loads
+- [ ] "Reports" page loads
 - [ ] "User Management" page loads (admin only)
 - [ ] "Settings" page loads
 

@@ -1,11 +1,11 @@
 # Carbon IMS - Claude Context File
 
 ## Project Overview
-Carbon IMS (Inventory Management System) is a Flask-based web application for managing carbon credit inventory, warranties, and trades. It features user authentication, role-based access control, activity logging, and backup/restore functionality.
+Carbon IMS (Inventory Management System) is a Flask-based web application for managing carbon credit inventory, warranties, and trades. It features user authentication, role-based access control, activity logging, trade criteria management, generic allocation, and backup/restore functionality.
 
 ## Technology Stack
 - **Backend**: Python 3, Flask
-- **Database**: SQLite (users.db for auth/logs, inventory.db for inventory data)
+- **Database**: SQLite (ims_users.db for auth/logs, ims_inventory.db for inventory/trades data)
 - **Frontend**: HTML, CSS, JavaScript (vanilla)
 - **Authentication**: Flask sessions with password hashing (werkzeug)
 
@@ -13,19 +13,20 @@ Carbon IMS (Inventory Management System) is a Flask-based web application for ma
 ```
 IMS/
 ├── app.py                 # Main Flask application entry point
-├── database.py            # All database functions (users, inventory, logs)
+├── database.py            # All database functions (users, inventory, trades, logs)
 ├── trades_data.py         # External trades data source configuration
 ├── routes/
 │   ├── __init__.py        # Blueprint exports
 │   ├── auth.py            # Authentication routes and decorators
 │   ├── inventory.py       # Inventory CRUD operations
 │   ├── warranties.py      # Warranty management
-│   ├── trades.py          # Trade assignment operations
+│   ├── trades.py          # Trade assignment, criteria, reservations
 │   ├── logs.py            # Activity logs with undo/redo
 │   ├── dashboard.py       # Dashboard analytics
 │   ├── reports.py         # Report generation
 │   ├── settings.py        # User settings
 │   ├── users.py           # User management (admin)
+│   ├── backups.py         # Backup management
 │   └── registry.py        # External registry queries
 ├── templates/
 │   ├── login.html         # Login page
@@ -37,7 +38,8 @@ IMS/
 │   ├── dashboard.html     # Analytics dashboard
 │   ├── reports.html       # Reports page
 │   ├── settings.html      # User settings
-│   └── users.html         # User management (admin)
+│   ├── users.html         # User management (admin)
+│   └── registry_data.html # Registry data viewer
 ├── static/
 │   ├── style.css          # Main stylesheet
 │   └── bg-forest.jpg      # Background image
@@ -47,15 +49,21 @@ IMS/
 
 ## Databases
 
-### users.db (Main Database)
+### ims_users.db (Main Database)
 - `users` - User accounts with roles and preferences
 - `role_permissions` - Page access permissions per role
-- `user_page_settings` - User-specific page settings (filters, etc.)
+- `user_settings` - User-specific page settings (filters, etc.)
 - `activity_logs` - All system activity for audit trail
 
-### inventory.db (Inventory Database)
+### ims_inventory.db (Inventory Database)
 - `inventory` - Carbon credit inventory items
+  - Columns: id, market, registry, product, project_id, project_type, protocol, project_name, vintage, serial, is_custody, is_assigned, trade_id, criteria_id, criteria_snapshot
 - `warranties` - Warranty information linked to inventory by serial
+- `inventory_backups` - Backup snapshots
+- `trade_criteria` - Trade criteria for generic allocation
+  - Columns: id, trade_id, direction, quantity_required, quantity_fulfilled, market, registry, product, project_type, protocol, project_id, vintage_from, vintage_to, status, created_by
+- `inventory_reservations` - Reservation history
+- `generic_inventory` - Generic inventory items
 
 ## Key Concepts
 
@@ -71,6 +79,14 @@ IMS/
 @write_access_required   # Requires admin or trader role
 @page_access_required('page_id')  # Checks role_permissions table
 ```
+
+### Trade Criteria System
+Trade criteria allows "Generic Allocation" - reserving inventory by criteria without specifying exact serials:
+- Create criteria with: registry, product, project_type, protocol, project_id, vintage_from, vintage_to, quantity
+- Status: 'criteria_only' for generic allocation
+- FIFO ordering: First criteria created gets priority for matching inventory
+- When inventory is assigned via criteria, `criteria_id` and `criteria_snapshot` are stored
+- When unassigned, criteria quantity is restored (or recreated if deleted)
 
 ### Activity Logging
 All data modifications should be logged using:
@@ -95,58 +111,6 @@ log_activity(
 - Uses `mark_activity_reverted()` and `clear_activity_reverted()`
 - Only works for inventory and warranty actions
 
-## Common Patterns
-
-### Adding a New Route
-1. Create route file in `routes/` folder
-2. Create Blueprint: `my_bp = Blueprint('my', __name__)`
-3. Add routes with appropriate decorators
-4. Export in `routes/__init__.py`
-5. Register in `app.py`: `app.register_blueprint(my_bp)`
-
-### Adding Activity Logging to a Route
-```python
-from database import log_activity
-
-# Get before_data if updating/deleting
-items = get_all_items()
-before_item = next((i for i in items if i.get('id') == target_id), None)
-
-# Perform the operation
-success, result = do_operation(data)
-
-if success:
-    log_activity(
-        username=session.get('user'),
-        action_type='update',
-        target_type='inventory',
-        target_id=str(target_id),
-        serial=data.get('Serial', ''),
-        details=f'Updated item: Serial {serial}',
-        before_data=dict(before_item) if before_item else None,
-        after_data=data
-    )
-```
-
-### Frontend Data Tables
-Tables use a common pattern:
-- Load data via `/api/{resource}/get`
-- Track modifications in `pendingModifications` object
-- Commit changes via `/api/{resource}/commit-batch`
-- Changes are logged in batch commit
-
-### Backup System
-- Backups stored in `backups/` as timestamped JSON files
-- Include inventory + warranty data
-- Created on: add, update, delete, import, batch commit
-- Restore available in inventory settings modal
-
-## trades_data.py Configuration
-Controls which columns display in trades table:
-```python
-DISPLAY_COLUMNS = ['DealNumber', 'Counterparty', 'Notional', ...]  # Set to None for all columns
-```
-
 ## Key Database Functions (database.py)
 
 ### Inventory
@@ -154,33 +118,59 @@ DISPLAY_COLUMNS = ['DealNumber', 'Counterparty', 'Notional', ...]  # Set to None
 - `add_inventory_item(data)` - Returns (success, id)
 - `update_inventory_item(row_index, data)` - Returns (success, message)
 - `delete_inventory_item(row_index)` - Returns (success, message)
+- `get_unassigned_inventory()` - Get items not assigned to trades
+
+### Trade Assignment
+- `assign_inventory_to_trade(serials, trade_id, warranty_data, criteria_id)` - Assign with optional criteria tracking
+- `unassign_inventory_from_trade(serials, username, restore_criteria)` - Unassign and restore criteria
+- `get_inventory_by_trade(trade_id)` - Get items for a trade
+
+### Trade Criteria
+- `create_trade_criteria(...)` - Create new criteria
+- `get_trade_criteria(trade_id)` - Get criteria for a trade
+- `update_criteria_quantity(trade_id, delta, username)` - FIFO quantity update
+- `update_specific_criteria_quantity(criteria_id, delta, username)` - Specific criteria update
+- `restore_criteria_on_unassign(criteria_id, quantity, username, snapshot)` - Restore/recreate criteria
+- `get_available_after_criteria_claims(criteria)` - Check availability considering claims
 
 ### Activity Logs
 - `log_activity(...)` - Create log entry
 - `get_activity_logs(filters, limit, offset)` - Query logs
 - `get_activity_log_by_id(id)` - Get single log with parsed JSON
 - `mark_activity_reverted(log_id, username)` - Mark as undone
-- `clear_activity_reverted(log_id)` - Clear undone status (for redo)
 
 ### Backups
 - `create_inventory_backup(username, description, changes_summary)`
 - `restore_inventory_backup(backup_id)` - Restores inventory + warranties
 
-## Recent Features Added
+## trades_data.py Configuration
+Controls which columns display in trades table:
+```python
+DISPLAY_COLUMNS = ['DealNumber', 'Counterparty', 'Notional', ...]  # Set to None for all columns
+```
 
-### Activity Logs Page (logs.html, routes/logs.py)
-- Displays all system activity
-- Filter by user, action, target, serial, date, status
-- Groups sequential operations (same user/action/target within 60 seconds)
-- Undo button for active items (admin only)
-- Redo button for undone items (admin only)
-- Expandable groups with "Undo All" / "Redo All"
+## Recent Features
 
-### Batch Commit Logging
-Inventory batch commits now log each individual change:
-- Modifications logged with before_data and after_data
-- Deletions logged with before_data
-- Additions logged with after_data
+### Trade Criteria & Generic Allocation
+- Create "criteria only" reservations on sell trades
+- Criteria match inventory by: registry, product, vintage range, project_id, etc.
+- FIFO ordering determines claim priority
+- Quantity automatically restored when inventory unassigned
+
+### Locate Inventory Modal
+- Search for matching inventory with criteria
+- Shows availability status (Available/Claimed)
+- Accounts for generic allocation claims
+- Groups consecutive serials
+
+### Criteria-Specific Assignment Tracking
+- When assigning via criteria's "+" button, stores criteria_id and snapshot
+- On unassign, restores exact criteria (or recreates if deleted)
+- Ensures criteria parameters preserved for recreation
+
+### Draggable Modals
+- All modals are draggable by header
+- Resets position when closed/reopened
 
 ## Environment
 - Windows 10/11

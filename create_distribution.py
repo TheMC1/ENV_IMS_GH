@@ -32,6 +32,7 @@ def create_distribution():
     include_files = [
         'app.py',
         'database.py',
+        'trades_data.py',
         'requirements.txt',
         'init_databases.py',
         'setup.bat',
@@ -41,6 +42,7 @@ def create_distribution():
         'README.md',
         'QUICK_START.md',
         'DEPLOYMENT_CHECKLIST.md',
+        'CLAUDE.md',
         'VERSION',
         '.gitignore'
     ]
@@ -63,7 +65,7 @@ def create_distribution():
         return False
 
     # Create ZIP file
-    zip_name = '../Carbon_IMS_v1.0_Distribution.zip'
+    zip_name = '../Carbon_IMS_v2.0_Distribution.zip'
 
     print("=" * 60)
     print("Creating Distribution Package")
