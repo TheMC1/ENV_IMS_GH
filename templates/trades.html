@@ -787,6 +787,213 @@
         .btn-create-serials:hover:not(:disabled) {
             box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
         }
+
+        /* Reserved Inventory Styles */
+        .reserved-row {
+            background-color: #fff3cd !important;
+        }
+
+        .reserved-row:hover {
+            background-color: #ffecb5 !important;
+        }
+
+        .reserved-badge {
+            background: #ffc107;
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .btn-reserve {
+            background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%);
+        }
+
+        .btn-reserve:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(253, 126, 20, 0.4);
+        }
+
+        .btn-release {
+            background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);
+        }
+
+        .btn-release:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+        }
+
+        .btn-deliver {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .btn-deliver:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        /* Reservation Mode Styles */
+        .mode-btn.reserve-mode.active {
+            background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%);
+            border-color: #fd7e14;
+            color: #333;
+        }
+
+        .warranty-form.reserve-mode {
+            background: #fff3cd;
+        }
+
+        .warranty-form.reserve-mode h5 {
+            color: #856404;
+        }
+
+        /* Generic Position Styles */
+        .generic-position-card {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .generic-position-card.fulfilled {
+            background: #e8f5e9;
+            border-color: #a5d6a7;
+        }
+
+        .generic-position-card.partial {
+            background: #fff3cd;
+            border-color: #ffe082;
+        }
+
+        .generic-position-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .generic-position-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1565c0;
+        }
+
+        .generic-position-status {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .generic-position-status.pending {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .generic-position-status.partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .generic-position-status.fulfilled {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .generic-position-details {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .generic-position-details p {
+            margin: 3px 0;
+        }
+
+        .generic-position-progress {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .generic-position-progress-bar {
+            height: 100%;
+            background: #28a745;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        /* Reservation Summary Styles */
+        .reservation-summary {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .reservation-summary-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .reservation-summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .reservation-summary-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Confirm Modal */
+        .confirm-modal .modal-dialog {
+            max-width: 400px;
+        }
+
+        .confirm-modal .modal-body {
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .confirm-modal .confirm-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #ffc107;
+        }
+
+        .confirm-modal .confirm-message {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .confirm-modal .modal-footer {
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .modal-btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #5a6268;
+        }
+
+        .modal-btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-btn-danger:hover {
+            background: #c82333;
+        }
     </style>
 </head>
 <body>
@@ -835,6 +1042,7 @@
                         <div class="tabs">
                             <button class="tab active" data-tab="unassigned">Unassigned Inventory</button>
                             <button class="tab" data-tab="assigned">Assigned to Trade</button>
+                            <button class="tab" data-tab="reserved">Reserved for Trade</button>
                         </div>
                         <div class="custody-filter" style="display: flex; align-items: center; gap: 8px;">
                             <label style="font-size: 12px; color: #fff; font-weight: 500;">Custody:</label>
@@ -903,11 +1111,13 @@
         let unassignedInventory = [];
         let unassignedInventoryFull = []; // Full list before custody filter
         let assignedInventory = [];
+        let reservedInventory = []; // Reserved inventory for selected trade
         let selectedSerials = new Set();
         let currentTab = 'unassigned';
         let filterCriteria = []; // Array of {field, value} objects
-        let actionMode = 'sell'; // 'sell' = assign existing inventory, 'buy' = create new serials
+        let actionMode = 'sell'; // 'sell' = assign existing inventory, 'buy' = create new serials, 'reserve' = reserve for sell
         let custodyFilterValue = 'exclude'; // 'exclude' = Not In Custody, 'all' = All, 'only' = In Custody Only
+        let allocatedSerials = new Set(); // Serials virtually allocated to criteria-only trades
         const userRole = '{{ user_role }}';
         const canWrite = ['admin', 'trader'].includes(userRole);
 
@@ -918,7 +1128,7 @@
         let tradeDisplayColumns = [];           // Will be populated from API headers
 
         // Display columns for inventory
-        const inventoryDisplayColumns = ['Serial', 'ProjectID', 'Product', 'Registry', 'Vintage', 'IsCustody'];
+        const inventoryDisplayColumns = ['Serial', 'ProjectID', 'ProjectType', 'Protocol', 'Product', 'Registry', 'Vintage', 'IsCustody'];
 
         document.addEventListener('DOMContentLoaded', function() {
             loadTrades();
@@ -959,11 +1169,20 @@
                 tradeQtyColumn = data.quantity_column || 'Notional';
                 tradeCptyColumn = data.counterparty_column || 'Counterparty';
 
+                // Store allocated serials for criteria-only trades
+                const allocSummary = data.allocation_summary || {};
+                allocatedSerials = new Set(allocSummary.allocated_serials || []);
+
                 // Use headers from API, excluding internal columns
                 tradeDisplayColumns = (data.headers || []).filter(h => !h.startsWith('_'));
 
                 document.getElementById('tradesCount').textContent = allTrades.length;
                 renderTradesTable();
+
+                // Re-render inventory table to update Available column if a trade is selected
+                if (selectedTrade) {
+                    renderInventoryTable();
+                }
             } catch (error) {
                 showError('Failed to load trades: ' + error.message);
             }
@@ -976,11 +1195,11 @@
             // Render headers
             headerRow.innerHTML = tradeDisplayColumns.map(col =>
                 `<th>${formatColumnName(col)}</th>`
-            ).join('') + '<th>Assigned</th>';
+            ).join('') + '<th>Assigned</th><th>Allocation</th>';
 
             // Render rows
             if (allTrades.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="' + (tradeDisplayColumns.length + 1) + '" class="no-selection">No trades available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="' + (tradeDisplayColumns.length + 2) + '" class="no-selection">No trades available</td></tr>';
                 return;
             }
 
@@ -1002,6 +1221,24 @@
                     ? `<span class="assigned-count">${assignedCount}</span>`
                     : '-';
 
+                // Allocation status indicator
+                let allocationBadge = '-';
+                if (trade._has_criteria) {
+                    const allocStatus = trade._allocation_status || 'unknown';
+                    const conflictsWith = trade._conflicts_with || [];
+                    if (allocStatus === 'sufficient') {
+                        allocationBadge = '<span class="status-badge" style="background: #d4edda; color: #155724;" title="Criteria assigned - sufficient inventory available">✓ OK</span>';
+                    } else if (allocStatus === 'insufficient') {
+                        const shortfall = trade._allocation_shortfall || 0;
+                        allocationBadge = `<span class="status-badge" style="background: #f8d7da; color: #721c24;" title="Insufficient inventory for criteria (shortfall: ${shortfall})">✗ -${shortfall}</span>`;
+                    } else if (allocStatus === 'conflict') {
+                        const conflictList = conflictsWith.length > 0 ? conflictsWith.join(', ') : 'unknown';
+                        allocationBadge = `<span class="status-badge" style="background: #fff3cd; color: #856404;" title="Conflict with: ${conflictList}">⚠ ${conflictsWith.length > 0 ? conflictsWith[0] : 'Conflict'}</span>`;
+                    } else {
+                        allocationBadge = '<span class="status-badge" style="background: #e2e3e5; color: #383d41;">Criteria</span>';
+                    }
+                }
+
                 const selectedTradeId = selectedTrade ? selectedTrade[tradeIdColumn] : null;
                 const isSelected = selectedTradeId === tradeId;
 
@@ -1009,6 +1246,7 @@
                             onclick="selectTrade('${tradeId}')">
                     ${cells}
                     <td>${assignedBadge}</td>
+                    <td>${allocationBadge}</td>
                 </tr>`;
             }).join('');
         }
@@ -1020,6 +1258,8 @@
                 return tid == tradeId || String(tid) === String(tradeId);
             });
             selectedSerials.clear();
+            locateCompleted = false; // Reset locate state when switching trades
+            locatedInventory = [];
 
             // Update visual selection
             document.querySelectorAll('#tradesBody tr').forEach(row => {
@@ -1049,6 +1289,11 @@
                 const assignedResp = await fetch(`/api/trades/assigned-inventory/${tradeId}`);
                 const assignedData = await assignedResp.json();
                 assignedInventory = assignedData.data || [];
+
+                // Load reserved inventory for selected trade
+                const reservedResp = await fetch(`/api/trades/reserved/${tradeId}`);
+                const reservedData = await reservedResp.json();
+                reservedInventory = reservedData.data || [];
 
                 renderInventoryTable();
             } catch (error) {
@@ -1195,26 +1440,54 @@
             const headerRow = document.getElementById('inventoryHeader');
             const tbody = document.getElementById('inventoryBody');
 
-            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            let items;
+            if (currentTab === 'unassigned') {
+                items = unassignedInventory;
+            } else if (currentTab === 'assigned') {
+                items = assignedInventory;
+            } else if (currentTab === 'reserved') {
+                // Reserved inventory already has correct format from API
+                items = reservedInventory.map(r => ({
+                    Serial: r.Serial || '',
+                    ProjectID: r.ProjectID || '',
+                    ProjectType: r.ProjectType || '',
+                    Protocol: r.Protocol || '',
+                    Product: r.Product || '',
+                    Registry: r.Registry || '',
+                    Vintage: r.Vintage || '',
+                    IsCustody: r.IsCustody || ''
+                }));
+            } else {
+                items = [];
+            }
 
             // Render headers with checkbox - change Serial to "Serial Range"
+            // Add "Available" column only for unassigned tab when there are criteria allocations
+            const showAvailable = currentTab === 'unassigned' && allocatedSerials.size > 0;
             headerRow.innerHTML = (canWrite ? '<th class="checkbox-cell"><input type="checkbox" onchange="toggleAllSelection(this)"></th>' : '') +
                 inventoryDisplayColumns.map(col => col === 'Serial' ? '<th>Serial Range</th>' : `<th>${col}</th>`).join('') +
-                '<th>Count</th>';
+                '<th>Count</th>' +
+                (showAvailable ? '<th>Available</th>' : '');
 
             // Render rows
+            const colCount = inventoryDisplayColumns.length + 2 + (showAvailable ? 1 : 0);
             if (!selectedTrade) {
                 hideSelectionToolbar();
-                tbody.innerHTML = '<tr><td colspan="' + (inventoryDisplayColumns.length + 2) + '" class="no-selection">Select a trade to view inventory</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="' + colCount + '" class="no-selection">Select a trade to view inventory</td></tr>';
                 return;
             }
 
             if (items.length === 0) {
                 hideSelectionToolbar();
-                const message = currentTab === 'unassigned'
-                    ? 'No unassigned inventory available'
-                    : 'No inventory assigned to this trade';
-                tbody.innerHTML = `<tr><td colspan="${inventoryDisplayColumns.length + 2}" class="no-selection">${message}</td></tr>`;
+                let message;
+                if (currentTab === 'unassigned') {
+                    message = 'No unassigned inventory available';
+                } else if (currentTab === 'assigned') {
+                    message = 'No inventory assigned to this trade';
+                } else if (currentTab === 'reserved') {
+                    message = 'No inventory reserved for this trade';
+                }
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="no-selection">${message}</td></tr>`;
                 return;
             }
 
@@ -1263,8 +1536,19 @@
                     return `<td title="${group.attributes[col] || ''}">${group.attributes[col] || ''}</td>`;
                 }).join('');
 
+                // Calculate available count (count - items allocated to criteria)
+                let availableCell = '';
+                if (showAvailable) {
+                    const allocatedInGroup = serials.filter(s => allocatedSerials.has(s)).length;
+                    const available = count - allocatedInGroup;
+                    const availableStyle = available < count
+                        ? (available === 0 ? 'color: #dc3545; font-weight: 600;' : 'color: #856404; font-weight: 600;')
+                        : 'color: #28a745;';
+                    availableCell = `<td style="text-align: center; ${availableStyle}">${available}</td>`;
+                }
+
                 const rowClass = allSelected ? 'selected-row' : '';
-                return `<tr class="${rowClass}">${checkbox}${cells}<td style="text-align: center; font-weight: 600;">${count}</td></tr>`;
+                return `<tr class="${rowClass}">${checkbox}${cells}<td style="text-align: center; font-weight: 600;">${count}</td>${availableCell}</tr>`;
             }).join('');
 
             // Set indeterminate state for partially selected groups
@@ -1292,6 +1576,7 @@
                 }
             });
             updateSelectionCount();
+            updateAssignmentPanel(); // Update the right panel with selected items
             renderInventoryTable(); // Re-render to update grouping based on selection
         }
 
@@ -1306,7 +1591,16 @@
         }
 
         function toggleAllSelection(checkbox) {
-            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            let items;
+            if (currentTab === 'unassigned') {
+                items = unassignedInventory;
+            } else if (currentTab === 'assigned') {
+                items = assignedInventory;
+            } else if (currentTab === 'reserved') {
+                items = reservedInventory.map(r => ({ Serial: r.Serial || '' }));
+            } else {
+                items = [];
+            }
             selectedSerials.clear();
 
             if (checkbox.checked) {
@@ -1320,6 +1614,8 @@
 
         function setActionMode(mode) {
             actionMode = mode;
+            locateCompleted = false; // Reset locate state when switching modes
+            locatedInventory = [];
             updateAssignmentPanel();
         }
 
@@ -1368,14 +1664,59 @@
                 </p>`;
             }
 
+            // Show criteria-only allocation info if applicable
+            if (trade._has_criteria) {
+                const allocStatus = trade._allocation_status || 'unknown';
+                const criteriaInfo = trade._criteria || {};
+                const conflictsWith = trade._conflicts_with || [];
+                let criteriaStatusHtml = '';
+                let conflictInfo = '';
+
+                if (allocStatus === 'sufficient') {
+                    criteriaStatusHtml = '<span style="color: #155724; font-weight: 600;">✓ Sufficient</span>';
+                } else if (allocStatus === 'insufficient') {
+                    const shortfall = trade._allocation_shortfall || 0;
+                    criteriaStatusHtml = `<span style="color: #721c24; font-weight: 600;">✗ Shortfall: ${shortfall}</span>`;
+                } else if (allocStatus === 'conflict') {
+                    criteriaStatusHtml = '<span style="color: #856404; font-weight: 600;">⚠ Conflict</span>';
+                    if (conflictsWith.length > 0) {
+                        conflictInfo = `<p style="margin: 4px 0 0 0; color: #856404; font-weight: 500;">Conflicts with: ${conflictsWith.join(', ')}</p>`;
+                    }
+                } else {
+                    criteriaStatusHtml = '<span style="color: #6c757d;">Assigned</span>';
+                }
+
+                tradeDetailsHtml += `
+                    <div style="background: #e9ecef; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 12px;">
+                        <p style="margin: 0 0 4px 0; font-weight: 600; color: #6f42c1;">
+                            Criteria-Only Allocation: ${criteriaStatusHtml}
+                        </p>
+                        <p style="margin: 0; color: #495057;">
+                            Qty: ${criteriaInfo.quantity || 'N/A'} |
+                            ${criteriaInfo.vintage_from || criteriaInfo.vintage_to ?
+                                `Vintage: ${criteriaInfo.vintage_from || '*'}-${criteriaInfo.vintage_to || '*'} | ` : ''}
+                            ${criteriaInfo.registry ? `Registry: ${criteriaInfo.registry} | ` : ''}
+                            ${criteriaInfo.project_type ? `Type: ${criteriaInfo.project_type}` : ''}
+                        </p>
+                        ${conflictInfo}
+                        <button onclick="removeCriteriaOnly()" style="margin-top: 6px; padding: 4px 10px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                            Remove Criteria
+                        </button>
+                    </div>
+                `;
+            }
+
             let html = `<div class="trade-details">${tradeDetailsHtml}</div>`;
 
             // Show mode toggle only for unassigned tab with write access
             if (isUnassignedTab && canWrite) {
                 html += `
-                    <div class="mode-toggle">
+                    <div class="mode-toggle" style="flex-wrap: wrap;">
                         <button class="mode-btn sell-mode ${actionMode === 'sell' ? 'active' : ''}" onclick="setActionMode('sell')">
-                            Assign Inventory (Sell)
+                            Assign (Sell)
+                        </button>
+                        <button class="mode-btn reserve-mode ${actionMode === 'reserve' ? 'active' : ''}" onclick="setActionMode('reserve')">
+                            Reserve (Sell Generic)
                         </button>
                         <button class="mode-btn buy-mode ${actionMode === 'buy' ? 'active' : ''}" onclick="setActionMode('buy')">
                             Create Serials (Buy)
@@ -1444,6 +1785,113 @@
                             Trade is fully allocated
                         </p>`;
                     }
+                } else if (actionMode === 'reserve') {
+                    // Reserve mode - earmark inventory for a sell generic trade
+                    // Use saved values if available, otherwise use defaults
+                    const qtyVal = savedCriteriaFields.reserveQuantity || (remainingQuantity > 0 ? remainingQuantity : 1);
+                    const vintageFromVal = savedCriteriaFields.reserveVintageFrom || '';
+                    const vintageToVal = savedCriteriaFields.reserveVintageTo || '';
+                    const registryVal = savedCriteriaFields.reserveRegistry || '';
+                    const productVal = savedCriteriaFields.reserveProduct || '';
+                    const projectTypeVal = savedCriteriaFields.reserveProjectType || '';
+                    const protocolVal = savedCriteriaFields.reserveProtocol || '';
+                    const projectIdVal = savedCriteriaFields.reserveProjectId || '';
+
+                    html += `
+                        <div class="warranty-form reserve-mode">
+                            <h5>Reserve Inventory for Sell Generic</h5>
+                            <p style="font-size: 12px; color: #555; margin: 8px 0;">
+                                Define criteria and quantity to reserve. Use "Locate" to check availability.
+                            </p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Quantity Needed *</label>
+                                    <input type="number" id="reserveQuantity" min="1" value="${qtyVal}" placeholder="Qty">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Vintage From</label>
+                                    <input type="text" id="reserveVintageFrom" value="${vintageFromVal}" placeholder="e.g., 2020">
+                                </div>
+                                <div class="form-group">
+                                    <label>Vintage To</label>
+                                    <input type="text" id="reserveVintageTo" value="${vintageToVal}" placeholder="e.g., 2023">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Registry</label>
+                                    <input type="text" id="reserveRegistry" value="${registryVal}" placeholder="e.g., Verra">
+                                </div>
+                                <div class="form-group">
+                                    <label>Product</label>
+                                    <input type="text" id="reserveProduct" value="${productVal}" placeholder="e.g., VCU">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Project Type</label>
+                                    <input type="text" id="reserveProjectType" value="${projectTypeVal}" placeholder="e.g., ARR">
+                                </div>
+                                <div class="form-group">
+                                    <label>Protocol</label>
+                                    <input type="text" id="reserveProtocol" value="${protocolVal}" placeholder="e.g., VM0007">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Project ID</label>
+                                    <input type="text" id="reserveProjectId" value="${projectIdVal}" placeholder="e.g., VCS-1234">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="locateResults" style="display: none;"></div>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <button class="btn-assign" style="flex: 1; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);" onclick="locateInventory()">
+                                Locate Inventory
+                            </button>
+                            <button class="btn-assign" style="flex: 1; background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);" onclick="assignCriteriaOnly()">
+                                Assign Criteria Only
+                            </button>
+                            <button class="btn-assign" style="width: 40px; flex: none; background: #6c757d; padding: 8px;" onclick="clearCriteriaFields()" title="Clear all fields">
+                                &#x2715;
+                            </button>
+                        </div>
+                        <p style="font-size: 11px; color: #666; margin: -5px 0 10px 0; text-align: center;">
+                            <strong>Locate:</strong> Reserve specific serials | <strong>Criteria Only:</strong> Record requirements without locking inventory
+                        </p>
+                    `;
+
+                    // Show selected items for reserve mode
+                    if (selectedCount > 0) {
+                        const serialArray = Array.from(selectedSerials);
+                        const ranges = groupSerialsIntoRanges(serialArray);
+                        const displayRanges = ranges.slice(0, 15);
+                        const moreRanges = ranges.length - 15;
+
+                        html += `
+                            <div class="selected-items" style="background: #fff3cd;">
+                                <h5 style="color: #856404;">Selected for Reservation (${selectedCount} serial${selectedCount !== 1 ? 's' : ''} in ${ranges.length} group${ranges.length !== 1 ? 's' : ''})</h5>
+                                <div class="selected-ranges">
+                                    ${displayRanges.map(r => `<span class="selected-range-item" style="border-color: #ffe082;">${r}</span>`).join('')}
+                                    ${moreRanges > 0 ? `<span class="selected-range-item" style="background: #fff3cd;">+ ${moreRanges} more groups</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const canReserve = selectedCount > 0 && locateCompleted;
+                    html += `
+                        <button class="btn-assign btn-reserve" onclick="reserveSelected()" ${!canReserve ? 'disabled' : ''}>
+                            Reserve ${selectedCount} Item${selectedCount !== 1 ? 's' : ''} for Trade
+                        </button>
+                    `;
+                    if (selectedCount > 0 && !locateCompleted) {
+                        html += `<p style="font-size: 11px; color: #856404; margin-top: 5px; text-align: center;">
+                            Use "Locate Inventory" to select items for reservation
+                        </p>`;
+                    }
                 } else {
                     // Buy mode - prompt to create serials via modal
                     html += `
@@ -1462,7 +1910,7 @@
                         </button>
                     `;
                 }
-            } else if (!isUnassignedTab && canWrite) {
+            } else if (currentTab === 'assigned' && canWrite) {
                 // Assigned tab - show unassign button
                 if (selectedCount > 0) {
                     const serialArray = Array.from(selectedSerials);
@@ -1485,6 +1933,39 @@
                     <button class="btn-assign btn-unassign" onclick="unassignSelected()" ${selectedCount === 0 ? 'disabled' : ''}>
                         Unassign ${selectedCount} Item${selectedCount !== 1 ? 's' : ''}
                     </button>
+                `;
+            } else if (currentTab === 'reserved' && canWrite) {
+                // Reserved tab - show release and deliver buttons
+                if (selectedCount > 0) {
+                    const serialArray = Array.from(selectedSerials);
+                    const ranges = groupSerialsIntoRanges(serialArray);
+                    const displayRanges = ranges.slice(0, 15);
+                    const moreRanges = ranges.length - 15;
+
+                    html += `
+                        <div class="selected-items" style="background: #fff3cd;">
+                            <h5 style="color: #856404;">Selected Reserved Items (${selectedCount} serial${selectedCount !== 1 ? 's' : ''} in ${ranges.length} group${ranges.length !== 1 ? 's' : ''})</h5>
+                            <div class="selected-ranges">
+                                ${displayRanges.map(r => `<span class="selected-range-item" style="border-color: #ffe082;">${r}</span>`).join('')}
+                                ${moreRanges > 0 ? `<span class="selected-range-item" style="background: #fff3cd;">+ ${moreRanges} more groups</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn-assign btn-release" style="flex: 1;" onclick="releaseSelected()" ${selectedCount === 0 ? 'disabled' : ''}>
+                            Release ${selectedCount} Item${selectedCount !== 1 ? 's' : ''}
+                        </button>
+                        <button class="btn-assign btn-deliver" style="flex: 1;" onclick="deliverSelected()" ${selectedCount === 0 ? 'disabled' : ''}>
+                            Mark as Delivered
+                        </button>
+                    </div>
+                    <p style="font-size: 11px; color: #666; margin-top: 8px; text-align: center;">
+                        Release: Remove reservation, making items available again.<br>
+                        Deliver: Mark reservation as fulfilled when inventory is transferred.
+                    </p>
                 `;
             } else if (!canWrite) {
                 html += '<p style="color: #666; text-align: center; margin-top: 20px;">Read-only mode - cannot modify assignments</p>';
@@ -1570,10 +2051,428 @@
             }
         }
 
+        // Store located inventory for selection
+        let locatedInventory = [];
+        let locateCompleted = false; // Track if locate was completed and items selected
+
+        async function locateInventory() {
+            if (!selectedTrade) {
+                showWarning('Please select a trade first');
+                return;
+            }
+
+            const quantity = parseInt(document.getElementById('reserveQuantity')?.value) || 0;
+            if (quantity <= 0) {
+                showWarning('Please enter a valid quantity');
+                return;
+            }
+
+            const criteria = {
+                vintage_from: document.getElementById('reserveVintageFrom')?.value || null,
+                vintage_to: document.getElementById('reserveVintageTo')?.value || null,
+                registry: document.getElementById('reserveRegistry')?.value || null,
+                product: document.getElementById('reserveProduct')?.value || null,
+                project_type: document.getElementById('reserveProjectType')?.value || null,
+                protocol: document.getElementById('reserveProtocol')?.value || null,
+                project_id: document.getElementById('reserveProjectId')?.value || null,
+                exclude_reserved: true,
+                exclude_assigned: true
+            };
+
+            // Remove null/empty values
+            Object.keys(criteria).forEach(key => {
+                if (criteria[key] === null || criteria[key] === '') {
+                    delete criteria[key];
+                }
+            });
+
+            try {
+                // Query available inventory
+                const response = await fetch('/api/trades/query-inventory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(criteria)
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError(result.error || 'Failed to locate inventory');
+                    return;
+                }
+
+                locatedInventory = result.data || [];
+                const availableCount = locatedInventory.length;
+
+                // Also check how many are already reserved (for context)
+                const reservedCriteria = { ...criteria, exclude_reserved: false, exclude_assigned: true };
+                const reservedResponse = await fetch('/api/trades/query-inventory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reservedCriteria)
+                });
+                const reservedResult = await reservedResponse.json();
+                const totalMatchingCount = reservedResult.data?.length || 0;
+                const alreadyReservedCount = totalMatchingCount - availableCount;
+
+                // Display results
+                const resultsDiv = document.getElementById('locateResults');
+                const sufficient = availableCount >= quantity;
+
+                let resultsHtml = `
+                    <div style="background: ${sufficient ? '#d4edda' : '#f8d7da'}; border: 1px solid ${sufficient ? '#c3e6cb' : '#f5c6cb'}; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+                        <div style="font-weight: 600; color: ${sufficient ? '#155724' : '#721c24'}; margin-bottom: 8px;">
+                            ${sufficient ? '✓ Sufficient Inventory Available' : '✗ Insufficient Inventory'}
+                        </div>
+                        <div style="font-size: 13px; color: #333;">
+                            <p style="margin: 4px 0;"><strong>Requested:</strong> ${quantity} unit(s)</p>
+                            <p style="margin: 4px 0;"><strong>Available:</strong> ${availableCount} unit(s)</p>
+                            <p style="margin: 4px 0; color: #856404;"><strong>Already Reserved (other trades):</strong> ${alreadyReservedCount} unit(s)</p>
+                            ${!sufficient ? `<p style="margin: 4px 0; color: #721c24;"><strong>Shortfall:</strong> ${quantity - availableCount} unit(s)</p>` : ''}
+                        </div>
+                `;
+
+                // Add button for insufficient inventory case
+                if (!sufficient && availableCount > 0) {
+                    resultsHtml += `
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f5c6cb;">
+                            <button class="btn-assign" style="width: 100%; background: linear-gradient(135deg, #6c757d 0%, #495057 100%);" onclick="selectLocatedInventory(${availableCount})">
+                                Select All ${availableCount} Available (Partial)
+                            </button>
+                            <p style="font-size: 11px; color: #666; margin-top: 5px; text-align: center;">
+                                Warning: This will only partially fulfill the requested quantity.
+                            </p>
+                        </div>
+                    `;
+                }
+
+                resultsHtml += '</div>';
+                resultsDiv.innerHTML = resultsHtml;
+                resultsDiv.style.display = 'block';
+
+                // Auto-select items when sufficient inventory is found
+                if (sufficient && availableCount > 0) {
+                    selectLocatedInventory(quantity);
+                }
+
+            } catch (error) {
+                showError('Failed to locate inventory: ' + error.message);
+            }
+        }
+
+        async function assignCriteriaOnly() {
+            if (!selectedTrade) {
+                showWarning('Please select a trade first');
+                return;
+            }
+
+            const quantity = parseInt(document.getElementById('reserveQuantity')?.value) || 0;
+            if (quantity <= 0) {
+                showWarning('Please enter a valid quantity');
+                return;
+            }
+
+            const criteria = {
+                trade_id: selectedTrade[tradeIdColumn],
+                quantity: quantity,
+                vintage_from: document.getElementById('reserveVintageFrom')?.value || null,
+                vintage_to: document.getElementById('reserveVintageTo')?.value || null,
+                registry: document.getElementById('reserveRegistry')?.value || null,
+                product: document.getElementById('reserveProduct')?.value || null,
+                project_type: document.getElementById('reserveProjectType')?.value || null,
+                protocol: document.getElementById('reserveProtocol')?.value || null,
+                project_id: document.getElementById('reserveProjectId')?.value || null
+            };
+
+            // Remove null/empty values (except trade_id and quantity)
+            Object.keys(criteria).forEach(key => {
+                if (key !== 'trade_id' && key !== 'quantity' && (criteria[key] === null || criteria[key] === '')) {
+                    delete criteria[key];
+                }
+            });
+
+            try {
+                const response = await fetch('/api/trades/assign-criteria', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(criteria)
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError(result.error || 'Failed to assign criteria');
+                    return;
+                }
+
+                // Show allocation status result
+                const allocStatus = result.allocation_status;
+                const available = result.allocation_available || 0;
+                const shortfall = result.allocation_shortfall || 0;
+
+                let statusMessage = `Criteria assigned to trade ${criteria.trade_id}. `;
+                if (allocStatus === 'sufficient') {
+                    statusMessage += `Sufficient inventory available (${available} units).`;
+                    showSuccess(statusMessage);
+                } else if (allocStatus === 'insufficient') {
+                    statusMessage += `WARNING: Insufficient inventory! Shortfall: ${shortfall} units.`;
+                    showWarning(statusMessage);
+                } else if (allocStatus === 'conflict') {
+                    statusMessage += 'WARNING: Inventory conflict with other trades!';
+                    showWarning(statusMessage);
+                } else {
+                    showSuccess(statusMessage);
+                }
+
+                // Reload trades to show updated allocation status
+                await loadTrades();
+                updateAssignmentPanel();
+
+            } catch (error) {
+                showError('Failed to assign criteria: ' + error.message);
+            }
+        }
+
+        // Store criteria field values to preserve across panel re-renders
+        let savedCriteriaFields = {};
+
+        function saveCriteriaFields() {
+            const fields = [
+                'reserveQuantity', 'reserveVintageFrom', 'reserveVintageTo',
+                'reserveRegistry', 'reserveProduct', 'reserveProjectType',
+                'reserveProtocol', 'reserveProjectId'
+            ];
+            savedCriteriaFields = {};
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.value) {
+                    savedCriteriaFields[id] = el.value;
+                }
+            });
+        }
+
+        function restoreCriteriaFields() {
+            Object.entries(savedCriteriaFields).forEach(([id, value]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = value;
+                }
+            });
+        }
+
+        function clearCriteriaFields() {
+            // Clear saved values
+            savedCriteriaFields = {};
+
+            // Clear all criteria input fields
+            const fields = [
+                'reserveQuantity', 'reserveVintageFrom', 'reserveVintageTo',
+                'reserveRegistry', 'reserveProduct', 'reserveProjectType',
+                'reserveProtocol', 'reserveProjectId'
+            ];
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+
+            // Reset quantity to remaining if available
+            if (selectedTrade) {
+                const tradeNotional = selectedTrade[tradeQtyColumn] || 0;
+                const alreadyAssigned = selectedTrade._assigned_count || 0;
+                const remaining = tradeNotional - alreadyAssigned;
+                const qtyEl = document.getElementById('reserveQuantity');
+                if (qtyEl && remaining > 0) {
+                    qtyEl.value = remaining;
+                }
+            }
+
+            // Hide locate results
+            const resultsDiv = document.getElementById('locateResults');
+            if (resultsDiv) {
+                resultsDiv.style.display = 'none';
+                resultsDiv.innerHTML = '';
+            }
+
+            // Clear selection
+            selectedSerials.clear();
+            locateCompleted = false;
+            locatedInventory = [];
+            updateAssignmentPanel();
+            renderInventoryTable();
+        }
+
+        async function removeCriteriaOnly() {
+            if (!selectedTrade) {
+                showWarning('Please select a trade first');
+                return;
+            }
+
+            const tradeId = selectedTrade[tradeIdColumn];
+
+            const confirmed = await showConfirm(`Remove criteria-only assignment from trade ${tradeId}?`, 'Remove Criteria');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/trades/criteria-only/${tradeId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(`Criteria removed from trade ${tradeId}`);
+                    await loadTrades();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to remove criteria');
+                }
+            } catch (error) {
+                showError('Failed to remove criteria: ' + error.message);
+            }
+        }
+
+        function selectLocatedInventory(count) {
+            if (locatedInventory.length === 0) {
+                showWarning('No inventory to select');
+                return;
+            }
+
+            // Save criteria fields before re-render
+            saveCriteriaFields();
+
+            // Clear current selection
+            selectedSerials.clear();
+
+            // Select the first 'count' items from located inventory
+            const toSelect = locatedInventory.slice(0, count);
+            toSelect.forEach(item => {
+                selectedSerials.add(item.Serial);
+            });
+
+            // Mark locate as completed - enables Reserve button
+            locateCompleted = true;
+
+            // Update UI
+            updateSelectionCount();
+            updateAssignmentPanel();
+            renderInventoryTable();
+
+            // Restore criteria fields after re-render
+            restoreCriteriaFields();
+
+            showSuccess(`Selected ${toSelect.length} item(s) matching criteria`);
+        }
+
+        async function reserveSelected() {
+            if (!selectedTrade || selectedSerials.size === 0) return;
+
+            const tradeId = selectedTrade[tradeIdColumn];
+
+            try {
+                const response = await fetch('/api/trades/reserve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        serials: Array.from(selectedSerials),
+                        trade_id: tradeId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(`Successfully reserved ${result.reserved_count} item(s) for trade ${tradeId}`);
+                    selectedSerials.clear();
+                    locateCompleted = false; // Reset for next reservation
+                    locatedInventory = [];
+                    await loadTrades();
+                    await loadInventory();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to reserve items');
+                }
+            } catch (error) {
+                showError('Failed to reserve items: ' + error.message);
+            }
+        }
+
+        async function releaseSelected() {
+            if (selectedSerials.size === 0) return;
+
+            try {
+                const response = await fetch('/api/trades/release-reservation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serials: Array.from(selectedSerials) })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(`Successfully released ${result.released_count} reservation(s)`);
+                    selectedSerials.clear();
+                    await loadTrades();
+                    await loadInventory();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to release reservations');
+                }
+            } catch (error) {
+                showError('Failed to release reservations: ' + error.message);
+            }
+        }
+
+        async function deliverSelected() {
+            if (selectedSerials.size === 0) return;
+
+            try {
+                const response = await fetch('/api/trades/deliver-reserved', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serials: Array.from(selectedSerials) })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(`Successfully marked ${result.delivered_count} item(s) as delivered`);
+                    selectedSerials.clear();
+                    await loadTrades();
+                    await loadInventory();
+                    updateAssignmentPanel();
+                } else {
+                    showError(result.error || 'Failed to mark items as delivered');
+                }
+            } catch (error) {
+                showError('Failed to mark items as delivered: ' + error.message);
+            }
+        }
+
         function updateGroupByOptions() {
             const field = document.getElementById('groupByField').value;
             const valueSelect = document.getElementById('groupByValue');
-            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            let items;
+            if (currentTab === 'unassigned') {
+                items = unassignedInventory;
+            } else if (currentTab === 'assigned') {
+                items = assignedInventory;
+            } else if (currentTab === 'reserved') {
+                items = reservedInventory.map(r => ({
+                    Serial: r.Serial || '',
+                    ProjectID: r.ProjectID || '',
+                    ProjectType: r.ProjectType || '',
+                    Protocol: r.Protocol || '',
+                    Product: r.Product || '',
+                    Registry: r.Registry || '',
+                    Vintage: r.Vintage || '',
+                    IsCustody: r.IsCustody || ''
+                }));
+            } else {
+                items = [];
+            }
 
             if (!field || items.length === 0) {
                 valueSelect.innerHTML = '<option value="">-- Select value --</option>';
@@ -1637,7 +2536,25 @@
                 return;
             }
 
-            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            let items;
+            if (currentTab === 'unassigned') {
+                items = unassignedInventory;
+            } else if (currentTab === 'assigned') {
+                items = assignedInventory;
+            } else if (currentTab === 'reserved') {
+                items = reservedInventory.map(r => ({
+                    Serial: r.Serial || '',
+                    ProjectID: r.ProjectID || '',
+                    ProjectType: r.ProjectType || '',
+                    Protocol: r.Protocol || '',
+                    Product: r.Product || '',
+                    Registry: r.Registry || '',
+                    Vintage: r.Vintage || '',
+                    IsCustody: r.IsCustody || ''
+                }));
+            } else {
+                items = [];
+            }
 
             // Find items matching ALL criteria (AND logic)
             const matchingItems = items.filter(item => {
@@ -1755,7 +2672,16 @@
                 return;
             }
 
-            const items = currentTab === 'unassigned' ? unassignedInventory : assignedInventory;
+            let items;
+            if (currentTab === 'unassigned') {
+                items = unassignedInventory;
+            } else if (currentTab === 'assigned') {
+                items = assignedInventory;
+            } else if (currentTab === 'reserved') {
+                items = reservedInventory.map(r => ({ Serial: r.Serial || '' }));
+            } else {
+                items = [];
+            }
             const requestedSerials = parseSerialInput(input);
             const availableSerials = new Set(items.map(i => i.Serial));
 
@@ -1942,6 +2868,31 @@
             }
         }
 
+        // Confirm dialog that returns a Promise
+        let confirmResolve = null;
+
+        function showConfirm(message, title = 'Confirm') {
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+                const overlay = document.getElementById('confirmModal');
+                const titleEl = overlay.querySelector('.modal-title');
+                const messageEl = overlay.querySelector('.confirm-message');
+
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                overlay.classList.add('active');
+            });
+        }
+
+        function closeConfirmModal(confirmed) {
+            const overlay = document.getElementById('confirmModal');
+            overlay.classList.remove('active');
+            if (confirmResolve) {
+                confirmResolve(confirmed);
+                confirmResolve = null;
+            }
+        }
+
         function openCreateSerialsModal() {
             if (!selectedTrade) {
                 showWarning('Please select a trade first');
@@ -2085,6 +3036,24 @@
             </div>
             <div class="modal-footer">
                 <button class="modal-btn modal-btn-primary" onclick="closeAlertModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal-overlay confirm-modal" id="confirmModal">
+        <div class="modal-dialog">
+            <div class="modal-header warning">
+                <span class="modal-title">Confirm</span>
+                <button class="modal-close" onclick="closeConfirmModal(false)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-icon">⚠</div>
+                <div class="confirm-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="closeConfirmModal(false)">Cancel</button>
+                <button class="modal-btn modal-btn-danger" onclick="closeConfirmModal(true)">Confirm</button>
             </div>
         </div>
     </div>

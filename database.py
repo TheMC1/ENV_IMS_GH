@@ -506,6 +506,134 @@ def init_inventory_database():
         except:
             pass
 
+    # Add reservation columns to inventory table if they don't exist
+    cursor.execute("PRAGMA table_info(inventory)")
+    inv_columns = [column[1] for column in cursor.fetchall()]
+
+    if 'is_reserved' not in inv_columns:
+        try:
+            cursor.execute("ALTER TABLE inventory ADD COLUMN is_reserved INTEGER DEFAULT 0")
+        except:
+            pass
+    if 'reserved_for_trade_id' not in inv_columns:
+        try:
+            cursor.execute("ALTER TABLE inventory ADD COLUMN reserved_for_trade_id TEXT")
+        except:
+            pass
+
+    # Create trade_criteria table for generic buy/sell positions
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS trade_criteria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trade_id TEXT NOT NULL,
+            direction TEXT NOT NULL CHECK(direction IN ('buy', 'sell')),
+            quantity_required INTEGER NOT NULL,
+            quantity_fulfilled INTEGER DEFAULT 0,
+            market TEXT,
+            registry TEXT,
+            product TEXT,
+            project_type TEXT,
+            protocol TEXT,
+            project_id TEXT,
+            vintage_from TEXT,
+            vintage_to TEXT,
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'partial', 'fulfilled', 'cancelled', 'criteria_only')),
+            created_by TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Migration: Add project_id column to trade_criteria if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE trade_criteria ADD COLUMN project_id TEXT")
+    except:
+        pass  # Column already exists
+
+    # Migration: Recreate trade_criteria table with updated CHECK constraint for 'criteria_only' status
+    # SQLite doesn't support modifying CHECK constraints, so we need to recreate the table
+    try:
+        # Check if migration is needed by trying to insert a test value
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='trade_criteria'")
+        table_def = cursor.fetchone()
+        if table_def and 'criteria_only' not in table_def[0]:
+            # Need to migrate - create new table with correct constraint
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trade_criteria_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trade_id TEXT NOT NULL,
+                    direction TEXT NOT NULL CHECK(direction IN ('buy', 'sell')),
+                    quantity_required INTEGER NOT NULL,
+                    quantity_fulfilled INTEGER DEFAULT 0,
+                    market TEXT,
+                    registry TEXT,
+                    product TEXT,
+                    project_type TEXT,
+                    protocol TEXT,
+                    project_id TEXT,
+                    vintage_from TEXT,
+                    vintage_to TEXT,
+                    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'partial', 'fulfilled', 'cancelled', 'criteria_only')),
+                    created_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            # Copy existing data
+            cursor.execute('''
+                INSERT INTO trade_criteria_new
+                SELECT id, trade_id, direction, quantity_required, quantity_fulfilled,
+                       market, registry, product, project_type, protocol, project_id,
+                       vintage_from, vintage_to, status, created_by, created_at, updated_at
+                FROM trade_criteria
+            ''')
+            # Drop old table and rename new one
+            cursor.execute('DROP TABLE trade_criteria')
+            cursor.execute('ALTER TABLE trade_criteria_new RENAME TO trade_criteria')
+            conn.commit()
+            print("Migrated trade_criteria table to support 'criteria_only' status")
+    except Exception as e:
+        print(f"trade_criteria migration note: {e}")
+
+    # Create inventory_reservations table to track reservation history
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_reservations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trade_id TEXT NOT NULL,
+            criteria_id INTEGER,
+            serial TEXT NOT NULL,
+            reserved_by TEXT NOT NULL,
+            reserved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            released_at TIMESTAMP,
+            released_by TEXT,
+            status TEXT DEFAULT 'active' CHECK(status IN ('active', 'released', 'delivered')),
+            FOREIGN KEY (criteria_id) REFERENCES trade_criteria(id),
+            FOREIGN KEY (serial) REFERENCES inventory(serial)
+        )
+    ''')
+
+    # Create generic_inventory table for buy positions with unknown serials
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS generic_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trade_id TEXT NOT NULL,
+            criteria_id INTEGER,
+            quantity INTEGER NOT NULL,
+            market TEXT,
+            registry TEXT,
+            product TEXT,
+            project_type TEXT,
+            protocol TEXT,
+            vintage TEXT,
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'partial', 'fulfilled')),
+            fulfilled_quantity INTEGER DEFAULT 0,
+            created_by TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (criteria_id) REFERENCES trade_criteria(id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("Inventory database initialized successfully.")
@@ -518,7 +646,7 @@ def get_all_inventory_items():
         cursor.execute("""
             SELECT id, market, registry, product, project_id, project_type,
                    protocol, project_name, vintage, serial, is_custody,
-                   is_assigned, trade_id
+                   is_assigned, trade_id, is_reserved, reserved_for_trade_id
             FROM inventory
             ORDER BY id
         """)
@@ -540,7 +668,9 @@ def get_all_inventory_items():
                 'Serial': row['serial'] or '',
                 'IsCustody': row['is_custody'] or '',
                 'IsAssigned': 'True' if row['is_assigned'] else 'False',
-                'TradeID': row['trade_id'] or ''
+                'TradeID': row['trade_id'] or '',
+                'IsReserved': 'True' if row['is_reserved'] else 'False',
+                'ReservedForTradeID': row['reserved_for_trade_id'] or ''
             }
             items.append(item_data)
 
@@ -1863,6 +1993,1147 @@ def get_distinct_log_values():
     except Exception as e:
         print(f"Error getting distinct log values: {e}")
         return {'usernames': [], 'action_types': [], 'target_types': []}
+
+
+# =============================================================================
+# INVENTORY RESERVATION FUNCTIONS (for Sell Generic)
+# =============================================================================
+
+def get_inventory_by_criteria(criteria, exclude_reserved=True, exclude_assigned=False):
+    """
+    Query inventory items matching the given criteria.
+
+    Args:
+        criteria: dict with optional keys: market, registry, product, project_type,
+                  protocol, vintage_from, vintage_to
+        exclude_reserved: if True, exclude items already reserved
+        exclude_assigned: if True, exclude items already assigned to trades
+
+    Returns:
+        List of matching inventory items
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT id, market, registry, product, project_id, project_type,
+                   protocol, project_name, vintage, serial, is_custody,
+                   is_assigned, trade_id, is_reserved, reserved_for_trade_id
+            FROM inventory
+            WHERE 1=1
+        """
+        params = []
+
+        if criteria.get('market'):
+            query += " AND market = ?"
+            params.append(criteria['market'])
+        if criteria.get('registry'):
+            query += " AND registry = ?"
+            params.append(criteria['registry'])
+        if criteria.get('product'):
+            query += " AND product = ?"
+            params.append(criteria['product'])
+        if criteria.get('project_type'):
+            query += " AND project_type = ?"
+            params.append(criteria['project_type'])
+        if criteria.get('protocol'):
+            query += " AND protocol = ?"
+            params.append(criteria['protocol'])
+        if criteria.get('project_id'):
+            query += " AND project_id = ?"
+            params.append(criteria['project_id'])
+        if criteria.get('vintage_from'):
+            query += " AND vintage >= ?"
+            params.append(criteria['vintage_from'])
+        if criteria.get('vintage_to'):
+            query += " AND vintage <= ?"
+            params.append(criteria['vintage_to'])
+
+        if exclude_reserved:
+            query += " AND (is_reserved = 0 OR is_reserved IS NULL)"
+        if exclude_assigned:
+            query += " AND (is_assigned = 0 OR is_assigned IS NULL)"
+
+        query += " ORDER BY vintage, serial"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        items = []
+        for row in rows:
+            items.append({
+                '_row_index': row['id'],
+                'Market': row['market'] or '',
+                'Registry': row['registry'] or '',
+                'Product': row['product'] or '',
+                'ProjectID': row['project_id'] or '',
+                'ProjectType': row['project_type'] or '',
+                'Protocol': row['protocol'] or '',
+                'ProjectName': row['project_name'] or '',
+                'Vintage': row['vintage'] or '',
+                'Serial': row['serial'] or '',
+                'IsCustody': row['is_custody'] or '',
+                'IsAssigned': 'True' if row['is_assigned'] else 'False',
+                'TradeID': row['trade_id'] or '',
+                'IsReserved': 'True' if row['is_reserved'] else 'False',
+                'ReservedForTradeID': row['reserved_for_trade_id'] or ''
+            })
+
+        return items
+    except Exception as e:
+        print(f"Error querying inventory by criteria: {e}")
+        return []
+
+
+def reserve_inventory(serials, trade_id, username, criteria_id=None):
+    """
+    Reserve inventory items for a trade.
+
+    Args:
+        serials: list of serial numbers to reserve
+        trade_id: the trade ID to reserve for
+        username: user making the reservation
+        criteria_id: optional link to trade_criteria record
+
+    Returns:
+        (success, message, count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        reserved_count = 0
+        already_reserved = []
+        not_found = []
+
+        for serial in serials:
+            # Check if item exists and is not already reserved
+            cursor.execute("""
+                SELECT id, is_reserved, reserved_for_trade_id
+                FROM inventory WHERE serial = ?
+            """, (serial,))
+            row = cursor.fetchone()
+
+            if not row:
+                not_found.append(serial)
+                continue
+
+            if row['is_reserved']:
+                already_reserved.append(serial)
+                continue
+
+            # Reserve the item
+            cursor.execute("""
+                UPDATE inventory SET
+                    is_reserved = 1,
+                    reserved_for_trade_id = ?
+                WHERE serial = ?
+            """, (trade_id, serial))
+
+            # Record in reservation history
+            cursor.execute("""
+                INSERT INTO inventory_reservations
+                (trade_id, criteria_id, serial, reserved_by, status)
+                VALUES (?, ?, ?, ?, 'active')
+            """, (trade_id, criteria_id, serial, username))
+
+            reserved_count += 1
+
+        conn.commit()
+        conn.close()
+
+        message = f"Reserved {reserved_count} item(s) for trade {trade_id}"
+        if already_reserved:
+            message += f". {len(already_reserved)} already reserved."
+        if not_found:
+            message += f". {len(not_found)} not found."
+
+        return True, message, reserved_count
+    except Exception as e:
+        print(f"Error reserving inventory: {e}")
+        return False, str(e), 0
+
+
+def release_reservation(serials, username):
+    """
+    Release reservation on inventory items.
+
+    Args:
+        serials: list of serial numbers to release
+        username: user releasing the reservation
+
+    Returns:
+        (success, message, count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        released_count = 0
+
+        for serial in serials:
+            # Update inventory
+            cursor.execute("""
+                UPDATE inventory SET
+                    is_reserved = 0,
+                    reserved_for_trade_id = NULL
+                WHERE serial = ? AND is_reserved = 1
+            """, (serial,))
+
+            if cursor.rowcount > 0:
+                released_count += 1
+
+                # Update reservation history
+                cursor.execute("""
+                    UPDATE inventory_reservations SET
+                        status = 'released',
+                        released_at = CURRENT_TIMESTAMP,
+                        released_by = ?
+                    WHERE serial = ? AND status = 'active'
+                """, (username, serial))
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Released {released_count} reservation(s)", released_count
+    except Exception as e:
+        print(f"Error releasing reservations: {e}")
+        return False, str(e), 0
+
+
+def get_reserved_inventory(trade_id=None):
+    """
+    Get all reserved inventory items, optionally filtered by trade.
+
+    Args:
+        trade_id: optional trade ID to filter by
+
+    Returns:
+        List of reserved inventory items
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT id, market, registry, product, project_id, project_type,
+                   protocol, project_name, vintage, serial, is_custody,
+                   is_assigned, trade_id, is_reserved, reserved_for_trade_id
+            FROM inventory
+            WHERE is_reserved = 1
+        """
+        params = []
+
+        if trade_id:
+            query += " AND reserved_for_trade_id = ?"
+            params.append(trade_id)
+
+        query += " ORDER BY serial"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        items = []
+        for row in rows:
+            items.append({
+                '_row_index': row['id'],
+                'Market': row['market'] or '',
+                'Registry': row['registry'] or '',
+                'Product': row['product'] or '',
+                'ProjectID': row['project_id'] or '',
+                'ProjectType': row['project_type'] or '',
+                'Protocol': row['protocol'] or '',
+                'ProjectName': row['project_name'] or '',
+                'Vintage': row['vintage'] or '',
+                'Serial': row['serial'] or '',
+                'IsCustody': row['is_custody'] or '',
+                'IsAssigned': 'True' if row['is_assigned'] else 'False',
+                'TradeID': row['trade_id'] or '',
+                'IsReserved': 'True',
+                'ReservedForTradeID': row['reserved_for_trade_id'] or ''
+            })
+
+        return items
+    except Exception as e:
+        print(f"Error getting reserved inventory: {e}")
+        return []
+
+
+def mark_reservation_delivered(serials, username):
+    """
+    Mark reserved items as delivered (assigned to trade).
+
+    Args:
+        serials: list of serial numbers
+        username: user performing the delivery
+
+    Returns:
+        (success, message, count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        delivered_count = 0
+
+        for serial in serials:
+            # Get the reserved trade ID
+            cursor.execute("""
+                SELECT reserved_for_trade_id FROM inventory
+                WHERE serial = ? AND is_reserved = 1
+            """, (serial,))
+            row = cursor.fetchone()
+
+            if row and row['reserved_for_trade_id']:
+                trade_id = row['reserved_for_trade_id']
+
+                # Update inventory - assign to trade and clear reservation
+                cursor.execute("""
+                    UPDATE inventory SET
+                        is_assigned = 1,
+                        trade_id = ?,
+                        is_reserved = 0,
+                        reserved_for_trade_id = NULL
+                    WHERE serial = ?
+                """, (trade_id, serial))
+
+                # Update reservation history
+                cursor.execute("""
+                    UPDATE inventory_reservations SET
+                        status = 'delivered',
+                        released_at = CURRENT_TIMESTAMP,
+                        released_by = ?
+                    WHERE serial = ? AND status = 'active'
+                """, (username, serial))
+
+                delivered_count += 1
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Delivered {delivered_count} item(s)", delivered_count
+    except Exception as e:
+        print(f"Error marking reservation as delivered: {e}")
+        return False, str(e), 0
+
+
+# =============================================================================
+# TRADE CRITERIA FUNCTIONS (for Generic Buy/Sell)
+# =============================================================================
+
+def create_trade_criteria(trade_id, direction, quantity, criteria, username):
+    """
+    Create a trade criteria record for generic buy/sell.
+
+    Args:
+        trade_id: the trade ID
+        direction: 'buy' or 'sell'
+        quantity: quantity required
+        criteria: dict with optional keys: market, registry, product, project_type,
+                  protocol, vintage_from, vintage_to
+        username: user creating the criteria
+
+    Returns:
+        (success, criteria_id or error message)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO trade_criteria
+            (trade_id, direction, quantity_required, market, registry, product,
+             project_type, protocol, vintage_from, vintage_to, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            trade_id,
+            direction,
+            quantity,
+            criteria.get('market'),
+            criteria.get('registry'),
+            criteria.get('product'),
+            criteria.get('project_type'),
+            criteria.get('protocol'),
+            criteria.get('vintage_from'),
+            criteria.get('vintage_to'),
+            username
+        ))
+
+        criteria_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return True, criteria_id
+    except Exception as e:
+        print(f"Error creating trade criteria: {e}")
+        return False, str(e)
+
+
+def get_trade_criteria(trade_id=None, criteria_id=None, direction=None, status=None):
+    """
+    Get trade criteria records.
+
+    Args:
+        trade_id: optional filter by trade ID
+        criteria_id: optional filter by criteria ID
+        direction: optional filter by direction ('buy' or 'sell')
+        status: optional filter by status
+
+    Returns:
+        List of trade criteria records
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM trade_criteria WHERE 1=1"
+        params = []
+
+        if trade_id:
+            query += " AND trade_id = ?"
+            params.append(trade_id)
+        if criteria_id:
+            query += " AND id = ?"
+            params.append(criteria_id)
+        if direction:
+            query += " AND direction = ?"
+            params.append(direction)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+
+        query += " ORDER BY created_at DESC"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"Error getting trade criteria: {e}")
+        return []
+
+
+def update_trade_criteria_fulfillment(criteria_id, quantity_fulfilled):
+    """
+    Update the fulfilled quantity for a trade criteria.
+
+    Args:
+        criteria_id: the criteria ID
+        quantity_fulfilled: new fulfilled quantity
+
+    Returns:
+        (success, message)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        # Get current criteria
+        cursor.execute("SELECT quantity_required FROM trade_criteria WHERE id = ?", (criteria_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return False, "Criteria not found"
+
+        quantity_required = row['quantity_required']
+
+        # Determine new status
+        if quantity_fulfilled >= quantity_required:
+            status = 'fulfilled'
+        elif quantity_fulfilled > 0:
+            status = 'partial'
+        else:
+            status = 'pending'
+
+        cursor.execute("""
+            UPDATE trade_criteria SET
+                quantity_fulfilled = ?,
+                status = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (quantity_fulfilled, status, criteria_id))
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Updated to {quantity_fulfilled}/{quantity_required} ({status})"
+    except Exception as e:
+        print(f"Error updating trade criteria fulfillment: {e}")
+        return False, str(e)
+
+
+def cancel_trade_criteria(criteria_id, username):
+    """
+    Cancel a trade criteria and release any reservations.
+
+    Args:
+        criteria_id: the criteria ID
+        username: user cancelling
+
+    Returns:
+        (success, message)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        # Update criteria status
+        cursor.execute("""
+            UPDATE trade_criteria SET
+                status = 'cancelled',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (criteria_id,))
+
+        # Release any reservations linked to this criteria
+        cursor.execute("""
+            SELECT serial FROM inventory_reservations
+            WHERE criteria_id = ? AND status = 'active'
+        """, (criteria_id,))
+        reserved_serials = [row['serial'] for row in cursor.fetchall()]
+
+        conn.commit()
+        conn.close()
+
+        # Release the reservations
+        if reserved_serials:
+            release_reservation(reserved_serials, username)
+
+        return True, f"Cancelled criteria and released {len(reserved_serials)} reservation(s)"
+    except Exception as e:
+        print(f"Error cancelling trade criteria: {e}")
+        return False, str(e)
+
+
+# =============================================================================
+# GENERIC INVENTORY FUNCTIONS (for Buy Generic)
+# =============================================================================
+
+def create_generic_inventory(trade_id, quantity, criteria, username, criteria_id=None):
+    """
+    Create a generic inventory position for a buy trade with unknown serials.
+
+    Args:
+        trade_id: the trade ID
+        quantity: expected quantity
+        criteria: dict with expected attributes
+        username: user creating the position
+        criteria_id: optional link to trade_criteria record
+
+    Returns:
+        (success, generic_id or error message)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO generic_inventory
+            (trade_id, criteria_id, quantity, market, registry, product,
+             project_type, protocol, vintage, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            trade_id,
+            criteria_id,
+            quantity,
+            criteria.get('market'),
+            criteria.get('registry'),
+            criteria.get('product'),
+            criteria.get('project_type'),
+            criteria.get('protocol'),
+            criteria.get('vintage'),
+            username
+        ))
+
+        generic_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return True, generic_id
+    except Exception as e:
+        print(f"Error creating generic inventory: {e}")
+        return False, str(e)
+
+
+def get_generic_inventory(trade_id=None, status=None):
+    """
+    Get generic inventory positions.
+
+    Args:
+        trade_id: optional filter by trade ID
+        status: optional filter by status
+
+    Returns:
+        List of generic inventory records
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM generic_inventory WHERE 1=1"
+        params = []
+
+        if trade_id:
+            query += " AND trade_id = ?"
+            params.append(trade_id)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+
+        query += " ORDER BY created_at DESC"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"Error getting generic inventory: {e}")
+        return []
+
+
+def fulfill_generic_inventory(generic_id, serials, username):
+    """
+    Fulfill a generic inventory position with actual serials.
+
+    Args:
+        generic_id: the generic inventory ID
+        serials: list of actual serial numbers to fulfill with
+        username: user performing fulfillment
+
+    Returns:
+        (success, message, fulfilled_count)
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        # Get generic inventory record
+        cursor.execute("SELECT * FROM generic_inventory WHERE id = ?", (generic_id,))
+        generic = cursor.fetchone()
+
+        if not generic:
+            conn.close()
+            return False, "Generic inventory not found", 0
+
+        trade_id = generic['trade_id']
+        current_fulfilled = generic['fulfilled_quantity'] or 0
+        quantity_needed = generic['quantity']
+
+        fulfilled_count = 0
+
+        for serial in serials:
+            if current_fulfilled + fulfilled_count >= quantity_needed:
+                break
+
+            # Assign the inventory item to the trade
+            cursor.execute("""
+                UPDATE inventory SET
+                    is_assigned = 1,
+                    trade_id = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE serial = ? AND (is_assigned = 0 OR is_assigned IS NULL)
+            """, (trade_id, serial))
+
+            if cursor.rowcount > 0:
+                fulfilled_count += 1
+
+        # Update generic inventory
+        new_fulfilled = current_fulfilled + fulfilled_count
+        if new_fulfilled >= quantity_needed:
+            status = 'fulfilled'
+        elif new_fulfilled > 0:
+            status = 'partial'
+        else:
+            status = 'pending'
+
+        cursor.execute("""
+            UPDATE generic_inventory SET
+                fulfilled_quantity = ?,
+                status = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (new_fulfilled, status, generic_id))
+
+        # Also update linked trade_criteria if exists
+        if generic['criteria_id']:
+            cursor.execute("""
+                UPDATE trade_criteria SET
+                    quantity_fulfilled = quantity_fulfilled + ?,
+                    status = CASE
+                        WHEN quantity_fulfilled + ? >= quantity_required THEN 'fulfilled'
+                        WHEN quantity_fulfilled + ? > 0 THEN 'partial'
+                        ELSE 'pending'
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (fulfilled_count, fulfilled_count, fulfilled_count, generic['criteria_id']))
+
+        conn.commit()
+        conn.close()
+
+        return True, f"Fulfilled {fulfilled_count} item(s). Total: {new_fulfilled}/{quantity_needed}", fulfilled_count
+    except Exception as e:
+        print(f"Error fulfilling generic inventory: {e}")
+        return False, str(e), 0
+
+
+def get_pending_generic_positions():
+    """
+    Get all pending or partially fulfilled generic positions.
+
+    Returns:
+        List of generic inventory records that need fulfillment
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT g.*,
+                   (g.quantity - COALESCE(g.fulfilled_quantity, 0)) as remaining
+            FROM generic_inventory g
+            WHERE g.status IN ('pending', 'partial')
+            ORDER BY g.created_at ASC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"Error getting pending generic positions: {e}")
+        return []
+
+
+def get_reservation_summary():
+    """
+    Get a summary of all reservations grouped by trade.
+
+    Returns:
+        Dict with trade_id keys and reservation counts/details
+    """
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT reserved_for_trade_id as trade_id,
+                   COUNT(*) as reserved_count
+            FROM inventory
+            WHERE is_reserved = 1
+            GROUP BY reserved_for_trade_id
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {row['trade_id']: row['reserved_count'] for row in rows}
+    except Exception as e:
+        print(f"Error getting reservation summary: {e}")
+        return {}
+
+
+# =============================================================================
+# CRITERIA ALLOCATION OPTIMIZER
+# =============================================================================
+
+def check_inventory_matches_criteria(item, criteria):
+    """
+    Check if an inventory item matches the given criteria.
+
+    Args:
+        item: dict with inventory item data
+        criteria: dict with criteria fields
+
+    Returns:
+        True if item matches all specified criteria
+    """
+    # Check each criteria field
+    if criteria.get('market') and item.get('market') != criteria.get('market'):
+        return False
+    if criteria.get('registry') and item.get('registry') != criteria.get('registry'):
+        return False
+    if criteria.get('product') and item.get('product') != criteria.get('product'):
+        return False
+    if criteria.get('project_type') and item.get('project_type') != criteria.get('project_type'):
+        return False
+    if criteria.get('protocol') and item.get('protocol') != criteria.get('protocol'):
+        return False
+    if criteria.get('project_id') and item.get('project_id') != criteria.get('project_id'):
+        return False
+
+    # Check vintage range
+    item_vintage = item.get('vintage', '')
+    if criteria.get('vintage_from') and item_vintage:
+        if str(item_vintage) < str(criteria.get('vintage_from')):
+            return False
+    if criteria.get('vintage_to') and item_vintage:
+        if str(item_vintage) > str(criteria.get('vintage_to')):
+            return False
+
+    return True
+
+
+def get_criteria_allocation_status():
+    """
+    Optimize and check allocation feasibility for all criteria-only trades.
+    Uses a maximum bipartite matching approach to find optimal allocation.
+
+    Returns:
+        dict with:
+        - 'trade_status': {trade_id: {'status': 'sufficient'|'insufficient'|'conflict',
+                                       'available': int, 'required': int, 'shortfall': int}}
+        - 'total_available': int
+        - 'total_required': int
+        - 'conflicts': list of conflicting trade pairs
+    """
+    conn = None
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        # Get all criteria_only criteria (active sell generic trades)
+        cursor.execute("""
+            SELECT * FROM trade_criteria
+            WHERE status = 'criteria_only' AND direction = 'sell'
+            ORDER BY created_at ASC
+        """)
+        all_criteria = [dict(row) for row in cursor.fetchall()]
+
+        # Get all available inventory (not reserved, not assigned)
+        cursor.execute("""
+            SELECT id, market, registry, product, project_id, project_type,
+                   protocol, vintage, serial
+            FROM inventory
+            WHERE (is_reserved = 0 OR is_reserved IS NULL)
+              AND (is_assigned = 0 OR is_assigned IS NULL)
+        """)
+        available_inventory = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        conn = None  # Mark as closed
+
+        if not all_criteria:
+            return {
+                'trade_status': {},
+                'total_available': len(available_inventory),
+                'total_required': 0,
+                'conflicts': [],
+                'allocation_possible': True
+            }
+
+        # Build matching matrix: which inventory items can satisfy which criteria
+        # criteria_matches[criteria_id] = [list of inventory item ids that match]
+        criteria_matches = {}
+        for crit in all_criteria:
+            criteria_matches[crit['id']] = []
+            for item in available_inventory:
+                if check_inventory_matches_criteria(item, crit):
+                    criteria_matches[crit['id']].append(item['id'])
+
+        # Track allocated inventory
+        allocated = set()
+        trade_status = {}
+        conflicts = []
+
+        # First pass: Check individual availability (total matching, ignoring other criteria)
+        for crit in all_criteria:
+            available_for_crit = len(criteria_matches[crit['id']])
+            required = crit['quantity_required']
+            trade_id = crit['trade_id']
+
+            if trade_id not in trade_status:
+                trade_status[trade_id] = {
+                    'status': 'sufficient' if available_for_crit >= required else 'insufficient',
+                    'available': available_for_crit,
+                    'required': required,
+                    'shortfall': max(0, required - available_for_crit),
+                    'criteria_id': crit['id'],
+                    'criteria': {
+                        'market': crit.get('market'),
+                        'registry': crit.get('registry'),
+                        'product': crit.get('product'),
+                        'project_type': crit.get('project_type'),
+                        'protocol': crit.get('protocol'),
+                        'project_id': crit.get('project_id'),
+                        'vintage_from': crit.get('vintage_from'),
+                        'vintage_to': crit.get('vintage_to')
+                    }
+                }
+
+        # Build id to serial mapping
+        id_to_serial = {item['id']: item['serial'] for item in available_inventory}
+
+        # Second pass: Simulate allocation in FIFO order (oldest criteria first)
+        # This ensures older trades get priority - newer trades causing conflicts are marked
+        # all_criteria is already ordered by created_at ASC from the SQL query
+        allocation_success = True
+        allocated = set()  # Set of item IDs
+        allocated_serials = set()  # Set of serial numbers
+
+        for crit in all_criteria:  # Process in creation order (oldest first)
+            trade_id = crit['trade_id']
+            required = crit['quantity_required']
+
+            # Get unallocated items that match this criteria
+            available_items = [
+                item_id for item_id in criteria_matches[crit['id']]
+                if item_id not in allocated
+            ]
+
+            if len(available_items) >= required:
+                # Allocate required items
+                for item_id in available_items[:required]:
+                    allocated.add(item_id)
+                    if item_id in id_to_serial:
+                        allocated_serials.add(id_to_serial[item_id])
+                trade_status[trade_id]['allocated'] = required
+            else:
+                # Not enough - mark as conflict
+                allocation_success = False
+                trade_status[trade_id]['status'] = 'conflict'
+                trade_status[trade_id]['allocated'] = len(available_items)
+                trade_status[trade_id]['shortfall'] = required - len(available_items)
+
+                # Allocate what we can
+                for item_id in available_items:
+                    allocated.add(item_id)
+                    if item_id in id_to_serial:
+                        allocated_serials.add(id_to_serial[item_id])
+
+        # Detect specific conflicts (which trades compete for same inventory)
+        # Also track which trades each trade conflicts with
+        trade_conflicts = {}  # trade_id -> list of conflicting trade_ids
+
+        for i, crit1 in enumerate(all_criteria):
+            for crit2 in all_criteria[i+1:]:
+                # Check if criteria overlap
+                overlap = set(criteria_matches[crit1['id']]) & set(criteria_matches[crit2['id']])
+                if overlap:
+                    combined_need = crit1['quantity_required'] + crit2['quantity_required']
+                    if combined_need > len(overlap):
+                        # These criteria compete and may not both be satisfiable
+                        conflicts.append({
+                            'trade1': crit1['trade_id'],
+                            'trade2': crit2['trade_id'],
+                            'overlap_count': len(overlap),
+                            'combined_need': combined_need
+                        })
+                        # Track conflicts for each trade
+                        if crit1['trade_id'] not in trade_conflicts:
+                            trade_conflicts[crit1['trade_id']] = []
+                        if crit2['trade_id'] not in trade_conflicts:
+                            trade_conflicts[crit2['trade_id']] = []
+                        trade_conflicts[crit1['trade_id']].append(crit2['trade_id'])
+                        trade_conflicts[crit2['trade_id']].append(crit1['trade_id'])
+
+        # Add conflicting trades to each trade's status
+        for trade_id, conflicting_trades in trade_conflicts.items():
+            if trade_id in trade_status:
+                trade_status[trade_id]['conflicts_with'] = list(set(conflicting_trades))
+
+        total_required = sum(c['quantity_required'] for c in all_criteria)
+
+        return {
+            'trade_status': trade_status,
+            'total_available': len(available_inventory),
+            'total_required': total_required,
+            'conflicts': conflicts,
+            'allocation_possible': allocation_success,
+            'allocated_serials': list(allocated_serials)
+        }
+
+    except Exception as e:
+        print(f"Error checking criteria allocation: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'trade_status': {},
+            'total_available': 0,
+            'total_required': 0,
+            'conflicts': [],
+            'allocation_possible': True,
+            'error': str(e)
+        }
+    finally:
+        if conn:
+            conn.close()
+
+
+def assign_criteria_only(trade_id, quantity, criteria, username):
+    """
+    Assign criteria to a trade without reserving specific inventory.
+    Records the criteria requirements for later allocation checking.
+
+    Args:
+        trade_id: the trade ID
+        quantity: required quantity
+        criteria: dict with filter criteria
+        username: user performing the action
+
+    Returns:
+        (success, message, criteria_id)
+    """
+    conn = None
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        # Check if criteria already exists for this trade
+        cursor.execute("""
+            SELECT id FROM trade_criteria
+            WHERE trade_id = ? AND direction = 'sell' AND status = 'criteria_only'
+        """, (str(trade_id),))
+        existing = cursor.fetchone()
+
+        if existing:
+            # Update existing criteria
+            cursor.execute("""
+                UPDATE trade_criteria SET
+                    quantity_required = ?,
+                    market = ?,
+                    registry = ?,
+                    product = ?,
+                    project_type = ?,
+                    protocol = ?,
+                    project_id = ?,
+                    vintage_from = ?,
+                    vintage_to = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (
+                quantity,
+                criteria.get('market'),
+                criteria.get('registry'),
+                criteria.get('product'),
+                criteria.get('project_type'),
+                criteria.get('protocol'),
+                criteria.get('project_id'),
+                criteria.get('vintage_from'),
+                criteria.get('vintage_to'),
+                existing['id']
+            ))
+            criteria_id = existing['id']
+            message = f"Updated criteria for trade {trade_id}"
+        else:
+            # Insert new criteria
+            cursor.execute("""
+                INSERT INTO trade_criteria
+                (trade_id, direction, quantity_required, market, registry, product,
+                 project_type, protocol, project_id, vintage_from, vintage_to, status, created_by)
+                VALUES (?, 'sell', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'criteria_only', ?)
+            """, (
+                str(trade_id),
+                quantity,
+                criteria.get('market'),
+                criteria.get('registry'),
+                criteria.get('product'),
+                criteria.get('project_type'),
+                criteria.get('protocol'),
+                criteria.get('project_id'),
+                criteria.get('vintage_from'),
+                criteria.get('vintage_to'),
+                username
+            ))
+            criteria_id = cursor.lastrowid
+            message = f"Assigned criteria to trade {trade_id}"
+
+        conn.commit()
+        return True, message, criteria_id
+
+    except Exception as e:
+        print(f"Error assigning criteria: {e}")
+        return False, str(e), None
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_trade_criteria_summary():
+    """
+    Get summary of all trades with criteria_only status.
+
+    Returns:
+        Dict mapping trade_id to criteria details
+    """
+    conn = None
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM trade_criteria
+            WHERE status = 'criteria_only'
+            ORDER BY trade_id
+        """)
+        rows = cursor.fetchall()
+
+        result = {}
+        for row in rows:
+            result[row['trade_id']] = {
+                'criteria_id': row['id'],
+                'quantity': row['quantity_required'],
+                'quantity_required': row['quantity_required'],
+                'direction': row['direction'],
+                'market': row['market'],
+                'registry': row['registry'],
+                'product': row['product'],
+                'project_type': row['project_type'],
+                'protocol': row['protocol'],
+                'project_id': row['project_id'],
+                'vintage_from': row['vintage_from'],
+                'vintage_to': row['vintage_to'],
+                'created_at': row['created_at']
+            }
+
+        return result
+
+    except Exception as e:
+        print(f"Error getting trade criteria summary: {e}")
+        return {}
+    finally:
+        if conn:
+            conn.close()
+
+
+def remove_trade_criteria(trade_id, username):
+    """
+    Remove criteria_only assignment from a trade.
+
+    Args:
+        trade_id: the trade ID
+        username: user performing the action
+
+    Returns:
+        (success, message)
+    """
+    conn = None
+    try:
+        conn = get_inventory_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            DELETE FROM trade_criteria
+            WHERE trade_id = ? AND status = 'criteria_only'
+        """, (str(trade_id),))
+
+        deleted = cursor.rowcount
+        conn.commit()
+
+        if deleted > 0:
+            return True, f"Removed criteria from trade {trade_id}"
+        else:
+            return False, "No criteria found for this trade"
+
+    except Exception as e:
+        print(f"Error removing trade criteria: {e}")
+        return False, str(e)
+    finally:
+        if conn:
+            conn.close()
 
 
 if __name__ == '__main__':

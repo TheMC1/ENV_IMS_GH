@@ -12,7 +12,29 @@ from database import (
     assign_inventory_to_trade,
     unassign_inventory_from_trade,
     create_serials_for_trade,
-    log_activity
+    log_activity,
+    # Reservation functions
+    get_inventory_by_criteria,
+    reserve_inventory,
+    release_reservation,
+    get_reserved_inventory,
+    mark_reservation_delivered,
+    get_reservation_summary,
+    # Trade criteria functions
+    create_trade_criteria,
+    get_trade_criteria,
+    update_trade_criteria_fulfillment,
+    cancel_trade_criteria,
+    # Generic inventory functions
+    create_generic_inventory,
+    get_generic_inventory,
+    fulfill_generic_inventory,
+    get_pending_generic_positions,
+    # Criteria allocation optimizer functions
+    assign_criteria_only,
+    get_criteria_allocation_status,
+    get_trade_criteria_summary,
+    remove_trade_criteria
 )
 from trades_data import (
     get_trades_dataframe, get_trade_by_id, get_trade_headers,
@@ -46,19 +68,58 @@ def get_trades():
         # Get the ID column name dynamically
         id_column = get_id_column_name()
 
-        # Add assignment status to each trade
+        # Get allocation status for all criteria-only trades
+        allocation_status = get_criteria_allocation_status()
+        criteria_summary = get_trade_criteria_summary()
+
+        # Add assignment status to each trade (includes both assigned and reserved)
         for trade in trades_list:
             deal_number = trade.get(id_column, '') if id_column else ''
+            deal_number_str = str(deal_number)
+
             assigned_items = get_inventory_by_trade(deal_number)
-            trade['_assigned_count'] = len(assigned_items)
-            trade['_assigned_serials'] = [item['Serial'] for item in assigned_items]
+            reserved_items = get_reserved_inventory(deal_number)
+
+            # Combine assigned and reserved counts
+            total_allocated = len(assigned_items) + len(reserved_items)
+            all_serials = [item['Serial'] for item in assigned_items] + [item['Serial'] for item in reserved_items]
+
+            trade['_assigned_count'] = total_allocated
+            trade['_assigned_serials'] = all_serials
+            trade['_reserved_count'] = len(reserved_items)
+
+            # Add criteria-only allocation status
+            if deal_number_str in criteria_summary:
+                trade['_has_criteria'] = True
+                trade['_criteria'] = criteria_summary[deal_number_str]
+
+                # Add optimizer status for this trade
+                if deal_number_str in allocation_status.get('trade_status', {}):
+                    status_info = allocation_status['trade_status'][deal_number_str]
+                    trade['_allocation_status'] = status_info['status']
+                    trade['_allocation_available'] = status_info.get('available', 0)
+                    trade['_allocation_shortfall'] = status_info.get('shortfall', 0)
+                    trade['_conflicts_with'] = status_info.get('conflicts_with', [])
+                else:
+                    trade['_allocation_status'] = 'unknown'
+                    trade['_conflicts_with'] = []
+            else:
+                trade['_has_criteria'] = False
+                trade['_allocation_status'] = None
 
         return jsonify({
             'headers': headers,
             'data': trades_list,
             'id_column': get_id_column_name(),
             'quantity_column': get_quantity_column_name(),
-            'counterparty_column': get_counterparty_column_name()
+            'counterparty_column': get_counterparty_column_name(),
+            'allocation_summary': {
+                'total_available': allocation_status.get('total_available', 0),
+                'total_required': allocation_status.get('total_required', 0),
+                'allocation_possible': allocation_status.get('allocation_possible', True),
+                'conflicts': allocation_status.get('conflicts', []),
+                'allocated_serials': allocation_status.get('allocated_serials', [])
+            }
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -79,13 +140,16 @@ def get_trade_details(deal_number):
         if not trade:
             return jsonify({'error': 'Trade not found'}), 404
 
-        # Get assigned inventory
+        # Get assigned and reserved inventory
         assigned_items = get_inventory_by_trade(deal_number)
+        reserved_items = get_reserved_inventory(deal_number)
 
         return jsonify({
             'trade': trade,
             'assigned_inventory': assigned_items,
-            'assigned_count': len(assigned_items)
+            'reserved_inventory': reserved_items,
+            'assigned_count': len(assigned_items) + len(reserved_items),
+            'reserved_count': len(reserved_items)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -380,5 +444,604 @@ def create_serials():
             })
         else:
             return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# RESERVATION ROUTES (for Sell Generic)
+# =============================================================================
+
+@trades_bp.route('/api/trades/query-inventory', methods=['POST'])
+@login_required
+def query_inventory_by_criteria():
+    """
+    Query inventory items matching specific criteria.
+    Used to find inventory that can be reserved for a sell trade.
+    """
+    try:
+        data = request.json
+        criteria = {
+            'market': data.get('market'),
+            'registry': data.get('registry'),
+            'product': data.get('product'),
+            'project_type': data.get('project_type'),
+            'protocol': data.get('protocol'),
+            'vintage_from': data.get('vintage_from'),
+            'vintage_to': data.get('vintage_to')
+        }
+        # Remove None values
+        criteria = {k: v for k, v in criteria.items() if v}
+
+        exclude_reserved = data.get('exclude_reserved', True)
+        exclude_assigned = data.get('exclude_assigned', True)
+
+        items = get_inventory_by_criteria(criteria, exclude_reserved, exclude_assigned)
+
+        return jsonify({
+            'success': True,
+            'data': items,
+            'count': len(items)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/reserve', methods=['POST'])
+@login_required
+@write_access_required
+def reserve_for_trade():
+    """
+    Reserve inventory items for a sell trade.
+    Earmarks inventory so it cannot be sold to someone else.
+    """
+    try:
+        data = request.json
+        serials = data.get('serials', [])
+        trade_id = data.get('trade_id')
+        criteria_id = data.get('criteria_id')
+        username = session.get('user')
+
+        if not serials:
+            return jsonify({'error': 'No serials provided'}), 400
+        if not trade_id:
+            return jsonify({'error': 'Trade ID is required'}), 400
+
+        success, message, count = reserve_inventory(serials, trade_id, username, criteria_id)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='reserve',
+                target_type='trade',
+                target_id=str(trade_id),
+                details=f'Reserved {count} item(s) for trade {trade_id}',
+                after_data={'trade_id': trade_id, 'serials': serials, 'criteria_id': criteria_id}
+            )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'reserved_count': count
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/release-reservation', methods=['POST'])
+@login_required
+@write_access_required
+def release_trade_reservation():
+    """
+    Release reservation on inventory items.
+    Used when a sell trade is cancelled or modified.
+    """
+    try:
+        data = request.json
+        serials = data.get('serials', [])
+        username = session.get('user')
+
+        if not serials:
+            return jsonify({'error': 'No serials provided'}), 400
+
+        # Get trade IDs for logging before releasing
+        reserved_items = []
+        for serial in serials:
+            items = get_reserved_inventory(None)  # Get all reserved
+            for item in items:
+                if item.get('serial') == serial:
+                    reserved_items.append(item)
+                    break
+
+        success, message, count = release_reservation(serials, username)
+
+        if success:
+            for item in reserved_items:
+                log_activity(
+                    username=username,
+                    action_type='release_reservation',
+                    target_type='trade',
+                    target_id=str(item.get('trade_id', '')),
+                    serial=item.get('serial'),
+                    details=f'Released reservation on serial {item.get("serial")}',
+                    before_data={'trade_id': item.get('trade_id'), 'serial': item.get('serial')}
+                )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'released_count': count
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/reserved/<trade_id>', methods=['GET'])
+@login_required
+def get_trade_reserved_inventory(trade_id):
+    """Get all inventory items reserved for a specific trade."""
+    try:
+        items = get_reserved_inventory(trade_id)
+        return jsonify({
+            'success': True,
+            'data': items,
+            'count': len(items)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/deliver-reserved', methods=['POST'])
+@login_required
+@write_access_required
+def deliver_reserved_inventory():
+    """
+    Mark reserved inventory as delivered.
+    Used when the sell trade is executed and inventory is transferred.
+    """
+    try:
+        data = request.json
+        serials = data.get('serials', [])
+        username = session.get('user')
+
+        if not serials:
+            return jsonify({'error': 'No serials provided'}), 400
+
+        success, message, count = mark_reservation_delivered(serials, username)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='deliver',
+                target_type='reservation',
+                details=f'Delivered {count} reserved item(s)',
+                after_data={'serials': serials}
+            )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'delivered_count': count
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/reservation-summary', methods=['GET'])
+@login_required
+def get_reservation_summary_route():
+    """Get summary of all reservations grouped by trade."""
+    try:
+        summary = get_reservation_summary()
+        return jsonify({
+            'success': True,
+            'data': summary
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# TRADE CRITERIA ROUTES
+# =============================================================================
+
+@trades_bp.route('/api/trades/criteria', methods=['POST'])
+@login_required
+@write_access_required
+def create_criteria():
+    """
+    Create trade criteria for a buy or sell generic trade.
+    Defines the parameters that inventory must match.
+    """
+    try:
+        data = request.json
+        trade_id = data.get('trade_id')
+        direction = data.get('direction')  # 'buy' or 'sell'
+        quantity = data.get('quantity')
+        username = session.get('user')
+
+        if not trade_id:
+            return jsonify({'error': 'Trade ID is required'}), 400
+        if not direction or direction not in ['buy', 'sell']:
+            return jsonify({'error': 'Direction must be "buy" or "sell"'}), 400
+        if not quantity or int(quantity) <= 0:
+            return jsonify({'error': 'Quantity must be a positive number'}), 400
+
+        criteria = {
+            'market': data.get('market'),
+            'registry': data.get('registry'),
+            'product': data.get('product'),
+            'project_type': data.get('project_type'),
+            'protocol': data.get('protocol'),
+            'vintage_from': data.get('vintage_from'),
+            'vintage_to': data.get('vintage_to')
+        }
+        # Remove None values
+        criteria = {k: v for k, v in criteria.items() if v}
+
+        success, message, criteria_id = create_trade_criteria(
+            trade_id, direction, int(quantity), criteria, username
+        )
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='create_criteria',
+                target_type='trade',
+                target_id=str(trade_id),
+                details=f'Created {direction} criteria for trade {trade_id}: {quantity} units',
+                after_data={'trade_id': trade_id, 'direction': direction, 'quantity': quantity, 'criteria': criteria}
+            )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'criteria_id': criteria_id
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/criteria/<trade_id>', methods=['GET'])
+@login_required
+def get_trade_criteria_route(trade_id):
+    """Get all criteria for a specific trade."""
+    try:
+        direction = request.args.get('direction')
+        status = request.args.get('status')
+
+        criteria_list = get_trade_criteria(trade_id=trade_id, direction=direction, status=status)
+        return jsonify({
+            'success': True,
+            'data': criteria_list
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/criteria/<int:criteria_id>/cancel', methods=['POST'])
+@login_required
+@write_access_required
+def cancel_criteria(criteria_id):
+    """Cancel a trade criteria."""
+    try:
+        username = session.get('user')
+
+        # Get criteria info before cancelling
+        criteria_list = get_trade_criteria(criteria_id=criteria_id)
+        criteria_info = criteria_list[0] if criteria_list else None
+
+        success, message = cancel_trade_criteria(criteria_id, username)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='cancel_criteria',
+                target_type='trade',
+                target_id=str(criteria_info.get('trade_id', '')) if criteria_info else '',
+                details=f'Cancelled criteria {criteria_id}',
+                before_data=criteria_info
+            )
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# GENERIC INVENTORY ROUTES (for Buy Generic)
+# =============================================================================
+
+@trades_bp.route('/api/trades/generic-position', methods=['POST'])
+@login_required
+@write_access_required
+def create_generic_position():
+    """
+    Create a generic inventory position for a buy trade.
+    Used when buying inventory that hasn't been delivered yet.
+    """
+    try:
+        data = request.json
+        trade_id = data.get('trade_id')
+        quantity = data.get('quantity')
+        criteria_id = data.get('criteria_id')
+        username = session.get('user')
+
+        if not trade_id:
+            return jsonify({'error': 'Trade ID is required'}), 400
+        if not quantity or int(quantity) <= 0:
+            return jsonify({'error': 'Quantity must be a positive number'}), 400
+
+        criteria = {
+            'market': data.get('market'),
+            'registry': data.get('registry'),
+            'product': data.get('product'),
+            'project_type': data.get('project_type'),
+            'protocol': data.get('protocol'),
+            'vintage': data.get('vintage')
+        }
+        # Remove None values
+        criteria = {k: v for k, v in criteria.items() if v}
+
+        success, message, generic_id = create_generic_inventory(
+            trade_id, int(quantity), criteria, username, criteria_id
+        )
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='create_generic',
+                target_type='trade',
+                target_id=str(trade_id),
+                details=f'Created generic position for trade {trade_id}: {quantity} units',
+                after_data={'trade_id': trade_id, 'quantity': quantity, 'criteria': criteria}
+            )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'generic_id': generic_id
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/generic/<trade_id>', methods=['GET'])
+@login_required
+def get_trade_generic_inventory(trade_id):
+    """Get all generic inventory positions for a specific trade."""
+    try:
+        status = request.args.get('status')
+        positions = get_generic_inventory(trade_id, status)
+        return jsonify({
+            'success': True,
+            'data': positions
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/generic/<int:generic_id>/fulfill', methods=['POST'])
+@login_required
+@write_access_required
+def fulfill_generic_position(generic_id):
+    """
+    Fulfill a generic inventory position with actual serials.
+    Used when the bought inventory is delivered and serials are known.
+    """
+    try:
+        data = request.json
+        serials = data.get('serials', [])
+        username = session.get('user')
+
+        if not serials:
+            return jsonify({'error': 'No serials provided'}), 400
+
+        success, message, fulfilled_count = fulfill_generic_inventory(generic_id, serials, username)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='fulfill_generic',
+                target_type='generic_position',
+                target_id=str(generic_id),
+                details=f'Fulfilled generic position {generic_id} with {fulfilled_count} serial(s)',
+                after_data={'generic_id': generic_id, 'serials': serials}
+            )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'fulfilled_count': fulfilled_count
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/pending-generic', methods=['GET'])
+@login_required
+def get_pending_positions():
+    """Get all pending generic inventory positions across all trades."""
+    try:
+        positions = get_pending_generic_positions()
+        return jsonify({
+            'success': True,
+            'data': positions
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# CRITERIA-ONLY ALLOCATION ROUTES
+# =============================================================================
+
+@trades_bp.route('/api/trades/assign-criteria', methods=['POST'])
+@login_required
+@write_access_required
+def assign_criteria_only_route():
+    """
+    Assign criteria to a trade without reserving specific inventory.
+    The optimizer will check if sufficient inventory exists to satisfy
+    all criteria-only trades collectively.
+    """
+    try:
+        data = request.json
+        trade_id = data.get('trade_id')
+        quantity = data.get('quantity')
+        username = session.get('user')
+
+        if not trade_id:
+            return jsonify({'error': 'Trade ID is required'}), 400
+        if not quantity or int(quantity) <= 0:
+            return jsonify({'error': 'Quantity must be a positive number'}), 400
+
+        criteria = {
+            'market': data.get('market'),
+            'registry': data.get('registry'),
+            'product': data.get('product'),
+            'project_type': data.get('project_type'),
+            'protocol': data.get('protocol'),
+            'project_id': data.get('project_id'),
+            'vintage_from': data.get('vintage_from'),
+            'vintage_to': data.get('vintage_to')
+        }
+        # Remove None/empty values
+        criteria = {k: v for k, v in criteria.items() if v}
+
+        success, message, criteria_id = assign_criteria_only(
+            trade_id, int(quantity), criteria, username
+        )
+
+        if success:
+            # Get updated allocation status
+            allocation_status = get_criteria_allocation_status()
+            trade_status = allocation_status.get('trade_status', {}).get(str(trade_id), {})
+
+            log_activity(
+                username=username,
+                action_type='assign_criteria_only',
+                target_type='trade',
+                target_id=str(trade_id),
+                details=f'Assigned criteria-only to trade {trade_id}: {quantity} units',
+                after_data={
+                    'trade_id': trade_id,
+                    'quantity': quantity,
+                    'criteria': criteria,
+                    'allocation_status': trade_status.get('status', 'unknown')
+                }
+            )
+            return jsonify({
+                'success': True,
+                'message': message,
+                'criteria_id': criteria_id,
+                'allocation_status': trade_status.get('status', 'unknown'),
+                'allocation_available': trade_status.get('available', 0),
+                'allocation_shortfall': trade_status.get('shortfall', 0)
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/allocation-status', methods=['GET'])
+@login_required
+def get_allocation_status_route():
+    """
+    Get allocation status for all criteria-only trades.
+    Returns optimizer results showing which trades can be satisfied
+    and any conflicts between overlapping criteria.
+    """
+    try:
+        status = get_criteria_allocation_status()
+        summary = get_trade_criteria_summary()
+
+        return jsonify({
+            'success': True,
+            'trade_status': status.get('trade_status', {}),
+            'total_available': status.get('total_available', 0),
+            'total_required': status.get('total_required', 0),
+            'allocation_possible': status.get('allocation_possible', True),
+            'conflicts': status.get('conflicts', []),
+            'criteria_summary': summary
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/criteria-only/<trade_id>', methods=['DELETE'])
+@login_required
+@write_access_required
+def remove_criteria_only_route(trade_id):
+    """
+    Remove criteria-only assignment from a trade.
+    This releases the criteria constraint without affecting reserved inventory.
+    """
+    try:
+        username = session.get('user')
+
+        # Get criteria info before removing
+        summary = get_trade_criteria_summary()
+        criteria_info = summary.get(str(trade_id), {})
+
+        success, message = remove_trade_criteria(trade_id, username)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='remove_criteria_only',
+                target_type='trade',
+                target_id=str(trade_id),
+                details=f'Removed criteria-only from trade {trade_id}',
+                before_data=criteria_info
+            )
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/criteria-only/<trade_id>', methods=['GET'])
+@login_required
+def get_criteria_only_route(trade_id):
+    """Get criteria-only assignment details for a specific trade."""
+    try:
+        summary = get_trade_criteria_summary()
+        criteria_info = summary.get(str(trade_id), None)
+
+        if not criteria_info:
+            return jsonify({
+                'success': True,
+                'has_criteria': False,
+                'data': None
+            })
+
+        # Get allocation status for this trade
+        allocation_status = get_criteria_allocation_status()
+        trade_status = allocation_status.get('trade_status', {}).get(str(trade_id), {})
+
+        return jsonify({
+            'success': True,
+            'has_criteria': True,
+            'data': criteria_info,
+            'allocation_status': trade_status.get('status', 'unknown'),
+            'allocation_available': trade_status.get('available', 0),
+            'allocation_shortfall': trade_status.get('shortfall', 0)
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

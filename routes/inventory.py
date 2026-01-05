@@ -17,7 +17,8 @@ from database import (
     get_user_page_settings,
     verify_user_password,
     get_inventory_db_connection,
-    log_activity
+    log_activity,
+    get_criteria_allocation_status
 )
 
 inventory_bp = Blueprint('inventory', __name__)
@@ -59,9 +60,18 @@ def get_inventory():
         data = get_all_inventory_items()
 
         if not headers:
-            return jsonify({'headers': [], 'data': []})
+            return jsonify({'headers': [], 'data': [], 'generic_reserved_serials': []})
 
-        return jsonify({'headers': headers, 'data': data})
+        # Get serials allocated to criteria-only trades (generic reservations)
+        allocation_status = get_criteria_allocation_status()
+        generic_reserved_serials = allocation_status.get('allocated_serials', [])
+
+        return jsonify({
+            'headers': headers,
+            'data': data,
+            'generic_reserved_serials': generic_reserved_serials,
+            'generic_reserved_count': len(generic_reserved_serials)
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

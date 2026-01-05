@@ -477,6 +477,38 @@
             font-size: 13px;
             color: #666;
         }
+
+        /* Reserved Inventory Styles */
+        .reserved-row {
+            background-color: #fff3cd !important;
+        }
+
+        .reserved-row:hover {
+            background-color: #ffecb5 !important;
+        }
+
+        .reserved-badge {
+            display: inline-block;
+            background: #fd7e14;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .reserved-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #856404;
+            background: #fff3cd;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #ffeeba;
+        }
     </style>
 </head>
 <body>
@@ -538,6 +570,12 @@
                             <option value="true" {% if custody_view == 'true' %}selected{% endif %}>In Custody</option>
                             <option value="false" {% if custody_view == 'false' %}selected{% endif %}>Available</option>
                         </select>
+                        <label style="margin-left: 20px;">Availability:</label>
+                        <select id="availabilityFilter" onchange="changeAvailabilityFilter()">
+                            <option value="all">All</option>
+                            <option value="available">Available Only</option>
+                            <option value="reserved">Reserved (Generic) Only</option>
+                        </select>
                         <label style="margin-left: 20px;">Rows per page:</label>
                         <select id="rowsPerPage" onchange="changeRowsPerPage()">
                             <option value="all" {% if rows_per_page == 'all' %}selected{% endif %}>All</option>
@@ -562,6 +600,29 @@
                             <button onclick="goToPage()" style="padding: 6px 12px; font-size: 14px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 500; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#0056b3'" onmouseout="this.style.backgroundColor='#007bff'">Go</button>
                         </div>
                         <button id="nextPage" onclick="changePage(1)" disabled>Next</button>
+                    </div>
+                </div>
+
+                <!-- Availability Summary Banner -->
+                <div id="availabilitySummary" style="display: none; margin: 10px 0; padding: 12px 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border-left: 4px solid #6f42c1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                            <div>
+                                <span style="color: #6c757d; font-size: 12px;">Total</span>
+                                <div style="font-size: 18px; font-weight: 600; color: #333;" id="summaryTotal">0</div>
+                            </div>
+                            <div>
+                                <span style="color: #6c757d; font-size: 12px;">Available</span>
+                                <div style="font-size: 18px; font-weight: 600; color: #28a745;" id="summaryAvailable">0</div>
+                            </div>
+                            <div>
+                                <span style="color: #6c757d; font-size: 12px;">Reserved (Generic)</span>
+                                <div style="font-size: 18px; font-weight: 600; color: #6f42c1;" id="summaryReserved">0</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #6c757d; max-width: 300px;">
+                            Reserved (Generic) items are virtually allocated to criteria-only trades but not yet assigned to specific serials.
+                        </div>
                     </div>
                 </div>
 
@@ -905,6 +966,10 @@
             deleted: []    // array of row_indexes
         };
         let nextTempId = -1; // For temporary IDs for new rows
+
+        // Generic reservation tracking (criteria-only trades)
+        let genericReservedSerials = new Set();
+        let availabilityFilter = 'all'; // 'all', 'available', 'reserved'
 
         // User role for access control
         const userRole = '{{ user_role }}';
@@ -1339,6 +1404,88 @@
             renderTable();
         }
 
+        function changeAvailabilityFilter() {
+            const select = document.getElementById('availabilityFilter');
+            availabilityFilter = select.value;
+            currentPage = 1; // Reset to first page
+            renderTable();
+        }
+
+        function updateAvailabilitySummary() {
+            const banner = document.getElementById('availabilitySummary');
+            if (!banner) return;
+
+            // Only show banner if there are generic reservations
+            if (genericReservedSerials.size === 0) {
+                banner.style.display = 'none';
+                return;
+            }
+
+            // Apply same filters as renderTable (excluding availability filter)
+            let filteredRows = inventoryData.filter(row => {
+                // Exclude deleted rows
+                if (pendingChanges.deleted.includes(row._row_index)) {
+                    return false;
+                }
+
+                // Apply custody filter
+                if (custodyFilter !== 'all') {
+                    const isCustody = (row['IsCustody'] || '').toString().toLowerCase();
+                    const isInCustody = isCustody === 'yes' || isCustody === 'true';
+                    const wantInCustody = custodyFilter === 'true';
+                    if (isInCustody !== wantInCustody) {
+                        return false;
+                    }
+                }
+
+                // Apply column filters
+                return headers.every(header => {
+                    const filterValue = (columnFilters[header] || '');
+                    if (!filterValue) return true;
+
+                    const cellValue = (row[header] || '').toString();
+
+                    // Check if filter contains wildcards
+                    if (filterValue.includes('*') || filterValue.includes('@') || filterValue.includes('#')) {
+                        return matchesWildcard(cellValue, filterValue);
+                    } else {
+                        // Regular case-insensitive substring match
+                        return cellValue.toLowerCase().includes(filterValue.toLowerCase());
+                    }
+                });
+            });
+
+            // Calculate totals from filtered data
+            let total = filteredRows.length;
+            let reserved = 0;
+
+            filteredRows.forEach(item => {
+                const serial = getSerialFromRow(item);
+                if (serial && genericReservedSerials.has(serial)) {
+                    reserved++;
+                }
+            });
+
+            const available = total - reserved;
+
+            // Update display
+            document.getElementById('summaryTotal').textContent = total.toLocaleString();
+            document.getElementById('summaryAvailable').textContent = available.toLocaleString();
+            document.getElementById('summaryReserved').textContent = reserved.toLocaleString();
+
+            banner.style.display = 'block';
+        }
+
+        function getSerialFromRow(row) {
+            // Try different variations of serial column name
+            return row['Serial'] || row['serial'] || row['SERIAL'] || '';
+        }
+
+        function isRowGenericReserved(row) {
+            const serial = getSerialFromRow(row);
+            return serial && genericReservedSerials.has(serial);
+        }
+
         // Load inventory data on page load
         document.addEventListener('DOMContentLoaded', function() {
             // columnFilters is already initialized from saved_filters
@@ -1442,6 +1589,10 @@
                 headers = data.headers;
                 inventoryData = data.data;
                 console.log(`Loaded ${inventoryData.length} items with ${headers.length} headers`);
+
+                // Store generic reserved serials (criteria-only allocations)
+                genericReservedSerials = new Set(data.generic_reserved_serials || []);
+                console.log(`Generic reserved serials: ${genericReservedSerials.size}`);
 
                 // Detect column data types
                 detectAllColumnTypes();
@@ -1596,6 +1747,9 @@
             const thead = document.getElementById('tableHead');
             const tbody = document.getElementById('tableBody');
 
+            // Check if we should show availability column
+            const showAvailabilityCol = genericReservedSerials.size > 0;
+
             // Render headers with sort indicators and filters
             let headerRow = '<tr>';
             headers.forEach(header => {
@@ -1604,6 +1758,14 @@
                     : '<span class="sort-indicator">⇅</span>';
                 headerRow += `<th class="sortable-header" onclick="toggleSort('${header}')">${header}${sortIndicator}</th>`;
             });
+            // Add availability column header
+            if (showAvailabilityCol) {
+                if (viewMode === 'summarized') {
+                    headerRow += '<th style="text-align: center;">Available</th>';
+                } else {
+                    headerRow += '<th style="text-align: center;">Status</th>';
+                }
+            }
             headerRow += '<th>Actions</th></tr>';
 
             // Filter row
@@ -1611,6 +1773,9 @@
             headers.forEach(header => {
                 filterRow += `<td><input type="text" name="table-filter-${header}" placeholder="Filter..." value="${columnFilters[header] || ''}" onchange="updateFilter('${header}', this.value)" autocomplete="off"></td>`;
             });
+            if (showAvailabilityCol) {
+                filterRow += '<td></td>'; // Empty cell for availability column
+            }
             filterRow += '<td></td></tr>';
 
             thead.innerHTML = headerRow + filterRow;
@@ -1627,6 +1792,19 @@
                 }
                 return row;
             });
+
+            // Apply availability filter (before summarization)
+            if (availabilityFilter !== 'all' && genericReservedSerials.size > 0) {
+                allRows = allRows.filter(row => {
+                    const isReserved = isRowGenericReserved(row);
+                    if (availabilityFilter === 'available') {
+                        return !isReserved;
+                    } else if (availabilityFilter === 'reserved') {
+                        return isReserved;
+                    }
+                    return true;
+                });
+            }
 
             // Track total underlying rows before summarization
             const totalUnderlyingRows = allRows.length;
@@ -1691,14 +1869,22 @@
                     tr.setAttribute('data-underlying-rows', JSON.stringify(row._underlying_rows || []));
                 }
 
-                // Add visual indicators for pending changes
+                // Check if row is reserved
+                const isReserved = row.is_reserved === 1 || row.is_reserved === '1' || row.is_reserved === true;
+                const reservedForTrade = row.reserved_for_trade_id || '';
+
+                // Add visual indicators for pending changes and reserved status
+                let rowClasses = [];
                 if (isDeleted) {
-                    tr.className = 'deleted-row';
+                    rowClasses.push('deleted-row');
                 } else if (isAdded) {
-                    tr.className = 'added-row';
+                    rowClasses.push('added-row');
                 } else if (isModified) {
-                    tr.className = 'modified-row';
+                    rowClasses.push('modified-row');
+                } else if (isReserved) {
+                    rowClasses.push('reserved-row');
                 }
+                tr.className = rowClasses.join(' ');
 
                 headers.forEach((header, headerIdx) => {
                     const td = document.createElement('td');
@@ -1720,19 +1906,79 @@
                     tr.appendChild(td);
                 });
 
+                // Availability/Status cell (if applicable)
+                if (showAvailabilityCol) {
+                    const availTd = document.createElement('td');
+                    availTd.style.textAlign = 'center';
+
+                    if (isSummarized && row._underlying_rows) {
+                        // For summarized view: calculate available count
+                        const totalCount = row._underlying_rows.length;
+                        let reservedGenericCount = 0;
+                        row._underlying_rows.forEach(idx => {
+                            const underlyingRow = inventoryData.find(r => r._row_index === idx);
+                            if (underlyingRow && isRowGenericReserved(underlyingRow)) {
+                                reservedGenericCount++;
+                            }
+                        });
+                        const availableCount = totalCount - reservedGenericCount;
+
+                        // Color-code based on availability
+                        let color = '#28a745'; // Green - all available
+                        if (availableCount === 0) {
+                            color = '#dc3545'; // Red - none available
+                        } else if (reservedGenericCount > 0) {
+                            color = '#856404'; // Yellow - partial
+                        }
+                        availTd.innerHTML = `<span style="font-weight: 600; color: ${color};">${availableCount}</span>`;
+                        availTd.title = `${availableCount} available, ${reservedGenericCount} reserved (generic)`;
+                    } else {
+                        // For by-serial view: show status indicator
+                        const isGenericReserved = isRowGenericReserved(row);
+                        if (isGenericReserved) {
+                            availTd.innerHTML = '<span style="background: #6f42c1; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Reserved</span>';
+                            availTd.title = 'Reserved (Generic) - allocated to criteria-only trade';
+                        } else {
+                            availTd.innerHTML = '<span style="background: #28a745; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Available</span>';
+                            availTd.title = 'Available for allocation';
+                        }
+                    }
+                    tr.appendChild(availTd);
+                }
+
                 // Actions cell
                 const actionsTd = document.createElement('td');
                 actionsTd.className = 'actions-cell';
                 if (isSummarized) {
                     // Show count of underlying rows
                     const count = row._underlying_rows ? row._underlying_rows.length : 0;
-                    actionsTd.innerHTML = `<span style="color: #666; font-size: 12px;">${count} row${count !== 1 ? 's' : ''}</span>`;
+                    // Check if any underlying rows are reserved (hard reserved for specific trade)
+                    let reservedBadge = '';
+                    if (row._underlying_rows) {
+                        const reservedCount = row._underlying_rows.filter(idx => {
+                            const underlyingRow = inventoryData.find(r => r._row_index === idx);
+                            return underlyingRow && (underlyingRow.is_reserved === 1 || underlyingRow.is_reserved === '1' || underlyingRow.is_reserved === true);
+                        }).length;
+                        if (reservedCount > 0) {
+                            reservedBadge = `<span class="reserved-badge" title="Reserved for trade">${reservedCount} reserved</span>`;
+                        }
+                    }
+                    actionsTd.innerHTML = `<span style="color: #666; font-size: 12px;">${count} row${count !== 1 ? 's' : ''}${reservedBadge}</span>`;
                 } else if (isReadOnly) {
-                    // No actions for read-only users
-                    actionsTd.innerHTML = `<span style="color: #999; font-size: 12px;">-</span>`;
+                    // No actions for read-only users, but show reserved badge if applicable
+                    if (isReserved) {
+                        actionsTd.innerHTML = `<span class="reserved-indicator" title="Reserved for trade ${reservedForTrade}">Reserved: ${reservedForTrade}</span>`;
+                    } else {
+                        actionsTd.innerHTML = `<span style="color: #999; font-size: 12px;">-</span>`;
+                    }
                 } else if (isDeleted) {
                     actionsTd.innerHTML = `
                         <button class="btn-small btn-warning" style="padding: 2px 8px;" onclick="undeleteRow(${rowIndex})">Undo Delete</button>
+                    `;
+                } else if (isReserved) {
+                    // Show reserved badge and delete button (can't delete reserved items easily)
+                    actionsTd.innerHTML = `
+                        <span class="reserved-indicator" title="Reserved for trade ${reservedForTrade}">Reserved: ${reservedForTrade}</span>
                     `;
                 } else {
                     actionsTd.innerHTML = `
@@ -1743,6 +1989,9 @@
 
                 tbody.appendChild(tr);
             });
+
+            // Update availability summary with current filter state
+            updateAvailabilitySummary();
         }
 
         function toggleSort(column) {
