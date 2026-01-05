@@ -576,6 +576,10 @@
                             <option value="available">Available Only</option>
                             <option value="reserved">Reserved (Generic) Only</option>
                         </select>
+                        <label style="margin-left: 20px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" id="hideReservedToggle" checked onchange="toggleHideReserved()">
+                            <span>Hide Reserved</span>
+                        </label>
                         <label style="margin-left: 20px;">Rows per page:</label>
                         <select id="rowsPerPage" onchange="changeRowsPerPage()">
                             <option value="all" {% if rows_per_page == 'all' %}selected{% endif %}>All</option>
@@ -970,6 +974,7 @@
         // Generic reservation tracking (criteria-only trades)
         let genericReservedSerials = new Set();
         let availabilityFilter = 'all'; // 'all', 'available', 'reserved'
+        let hideReserved = true; // Hide IsReserved=True items by default
 
         // Helper function to format numbers with commas
         function formatNumber(num) {
@@ -1419,6 +1424,13 @@
             renderTable();
         }
 
+        function toggleHideReserved() {
+            const checkbox = document.getElementById('hideReservedToggle');
+            hideReserved = checkbox.checked;
+            currentPage = 1; // Reset to first page
+            renderTable();
+        }
+
         function updateAvailabilitySummary() {
             const banner = document.getElementById('availabilitySummary');
             if (!banner) return;
@@ -1442,6 +1454,14 @@
                     const isInCustody = isCustody === 'yes' || isCustody === 'true';
                     const wantInCustody = custodyFilter === 'true';
                     if (isInCustody !== wantInCustody) {
+                        return false;
+                    }
+                }
+
+                // Apply IsReserved filter
+                if (hideReserved) {
+                    const isReserved = (row['IsReserved'] || '').toString().toLowerCase();
+                    if (isReserved === 'true' || isReserved === 'yes' || isReserved === '1') {
                         return false;
                     }
                 }
@@ -1646,6 +1666,14 @@
                     const isInCustody = isCustody === 'yes' || isCustody === 'true';
                     const wantInCustody = custodyFilter === 'true';
                     if (isInCustody !== wantInCustody) {
+                        return false;
+                    }
+                }
+
+                // Apply IsReserved filter
+                if (hideReserved) {
+                    const isReserved = (row['IsReserved'] || '').toString().toLowerCase();
+                    if (isReserved === 'true' || isReserved === 'yes' || isReserved === '1') {
                         return false;
                     }
                 }
