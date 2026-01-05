@@ -489,6 +489,11 @@
             width: 90%;
             max-height: 80vh;
             overflow: hidden;
+            position: relative;
+        }
+
+        .modal-dialog.dragging {
+            user-select: none;
         }
 
         .modal-header {
@@ -499,6 +504,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: move;
         }
 
         .modal-header.success {
@@ -707,7 +713,65 @@
             }
 
             loadReportData();
+            initDraggableModals();
         });
+
+        // Make all modals draggable by their header
+        function initDraggableModals() {
+            document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                const dialog = overlay.querySelector('.modal-dialog');
+                const header = overlay.querySelector('.modal-header');
+
+                if (!dialog || !header) return;
+
+                let isDragging = false;
+                let startX, startY;
+                let dialogX = 0, dialogY = 0;
+
+                header.addEventListener('mousedown', function(e) {
+                    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+
+                    isDragging = true;
+                    dialog.classList.add('dragging');
+
+                    const transform = window.getComputedStyle(dialog).transform;
+                    if (transform && transform !== 'none') {
+                        const matrix = new DOMMatrixReadOnly(transform);
+                        dialogX = matrix.m41;
+                        dialogY = matrix.m42;
+                    }
+
+                    startX = e.clientX - dialogX;
+                    startY = e.clientY - dialogY;
+                    e.preventDefault();
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isDragging) return;
+                    dialogX = e.clientX - startX;
+                    dialogY = e.clientY - startY;
+                    dialog.style.transform = `translate(${dialogX}px, ${dialogY}px)`;
+                });
+
+                document.addEventListener('mouseup', function() {
+                    if (isDragging) {
+                        isDragging = false;
+                        dialog.classList.remove('dragging');
+                    }
+                });
+
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'class' && !overlay.classList.contains('active')) {
+                            dialog.style.transform = '';
+                            dialogX = 0;
+                            dialogY = 0;
+                        }
+                    });
+                });
+                observer.observe(overlay, { attributes: true });
+            });
+        }
 
         function toggleSettings() {
             const body = document.getElementById('settingsBody');

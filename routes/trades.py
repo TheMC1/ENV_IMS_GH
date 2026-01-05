@@ -34,7 +34,13 @@ from database import (
     assign_criteria_only,
     get_criteria_allocation_status,
     get_trade_criteria_summary,
-    remove_trade_criteria
+    remove_trade_criteria,
+    remove_single_criteria,
+    update_single_criteria,
+    update_criteria_quantity,
+    update_specific_criteria_quantity,
+    get_trade_criteria_ids,
+    get_available_after_criteria_claims
 )
 from trades_data import (
     get_trades_dataframe, get_trade_by_id, get_trade_headers,
@@ -91,7 +97,23 @@ def get_trades():
             # Add criteria-only allocation status
             if deal_number_str in criteria_summary:
                 trade['_has_criteria'] = True
-                trade['_criteria'] = criteria_summary[deal_number_str]
+                criteria_list = criteria_summary[deal_number_str]
+
+                # Merge per-criteria status into each criteria
+                criteria_status = allocation_status.get('criteria_status', {})
+                for crit in criteria_list:
+                    crit_id = crit.get('criteria_id')
+                    if crit_id and crit_id in criteria_status:
+                        crit_status_info = criteria_status[crit_id]
+                        crit['_status'] = crit_status_info.get('status', 'unknown')
+                        crit['_available'] = crit_status_info.get('available', 0)
+                        crit['_shortfall'] = crit_status_info.get('shortfall', 0)
+                    else:
+                        crit['_status'] = 'unknown'
+                        crit['_available'] = 0
+                        crit['_shortfall'] = 0
+
+                trade['_criteria'] = criteria_list
 
                 # Add optimizer status for this trade
                 if deal_number_str in allocation_status.get('trade_status', {}):
@@ -186,6 +208,7 @@ def assign_to_trade():
         data = request.json
         serials = data.get('serials', [])
         trade_id = data.get('trade_id')
+        criteria_id = data.get('criteria_id')  # Optional: specific criteria to deduct from
         warranty_data = data.get('warranty_data')
         username = session.get('user')
 
@@ -194,7 +217,7 @@ def assign_to_trade():
         if not trade_id:
             return jsonify({'error': 'No trade_id provided'}), 400
 
-        success, message, count = assign_inventory_to_trade(serials, trade_id, warranty_data)
+        success, message, count = assign_inventory_to_trade(serials, trade_id, warranty_data, criteria_id)
 
         if success:
             # Log the activity for each serial
@@ -206,8 +229,18 @@ def assign_to_trade():
                     target_id=str(trade_id),
                     serial=serial,
                     details=f'Assigned serial {serial} to trade {trade_id}',
-                    after_data={'trade_id': trade_id, 'serial': serial, 'warranty_data': warranty_data}
+                    after_data={'trade_id': trade_id, 'serial': serial, 'warranty_data': warranty_data, 'criteria_id': criteria_id}
                 )
+
+            # Update criteria quantities if trade has criteria (reduce by assigned count)
+            if count > 0 and get_trade_criteria_ids(trade_id):
+                if criteria_id:
+                    # Deduct from specific criteria
+                    update_specific_criteria_quantity(criteria_id, -count, username)
+                else:
+                    # Use FIFO (first criteria)
+                    update_criteria_quantity(trade_id, -count, username)
+
             return jsonify({
                 'success': True,
                 'message': message,
@@ -239,7 +272,7 @@ def unassign_from_trade():
             if item.get('Serial') in serials:
                 serial_trade_map[item.get('Serial')] = item.get('TradeID', item.get('trade_id', ''))
 
-        success, message, count = unassign_inventory_from_trade(serials)
+        success, message, count = unassign_inventory_from_trade(serials, username)
 
         if success:
             # Log the activity for each serial
@@ -254,6 +287,10 @@ def unassign_from_trade():
                     details=f'Unassigned serial {serial} from trade {previous_trade}',
                     before_data={'trade_id': previous_trade, 'serial': serial}
                 )
+
+            # Note: Criteria quantity restoration is now handled in unassign_inventory_from_trade()
+            # based on the stored criteria_id for each inventory item
+
             return jsonify({
                 'success': True,
                 'message': message,
@@ -482,6 +519,42 @@ def query_inventory_by_criteria():
             'success': True,
             'data': items,
             'count': len(items)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/check-availability', methods=['POST'])
+@login_required
+def check_inventory_availability():
+    """
+    Check inventory availability accounting for Generic Allocation claims.
+    Returns the true available count after subtracting items claimed by
+    existing criteria-only allocations.
+    """
+    try:
+        data = request.json
+        criteria = {
+            'registry': data.get('registry'),
+            'product': data.get('product'),
+            'project_type': data.get('project_type'),
+            'protocol': data.get('protocol'),
+            'project_id': data.get('project_id'),
+            'vintage_from': data.get('vintage_from'),
+            'vintage_to': data.get('vintage_to')
+        }
+        # Remove None/empty values
+        criteria = {k: v for k, v in criteria.items() if v}
+
+        result = get_available_after_criteria_claims(criteria)
+
+        return jsonify({
+            'success': True,
+            'total_matching': result.get('total_matching', 0),
+            'claimed_by_criteria': result.get('claimed_by_criteria', 0),
+            'available': result.get('available', 0),
+            'criteria_claims': result.get('criteria_claims', []),
+            'inventory_items': result.get('inventory_items', [])
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1005,6 +1078,74 @@ def remove_criteria_only_route(trade_id):
                 target_id=str(trade_id),
                 details=f'Removed criteria-only from trade {trade_id}',
                 before_data=criteria_info
+            )
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/criteria/<int:criteria_id>', methods=['DELETE'])
+@login_required
+@write_access_required
+def remove_single_criteria_route(criteria_id):
+    """Remove a single criteria by its ID."""
+    try:
+        username = session.get('username', 'unknown')
+
+        success, message = remove_single_criteria(criteria_id, username)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='remove_single_criteria',
+                target_type='criteria',
+                target_id=str(criteria_id),
+                details=f'Removed criteria {criteria_id}'
+            )
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@trades_bp.route('/api/trades/criteria/<int:criteria_id>', methods=['PUT'])
+@login_required
+@write_access_required
+def update_single_criteria_route(criteria_id):
+    """Update a single criteria by its ID."""
+    try:
+        data = request.json
+        username = session.get('username', 'unknown')
+
+        quantity = data.get('quantity', 0)
+        criteria = {
+            'registry': data.get('registry'),
+            'product': data.get('product'),
+            'project_type': data.get('project_type'),
+            'protocol': data.get('protocol'),
+            'project_id': data.get('project_id'),
+            'vintage_from': data.get('vintage_from'),
+            'vintage_to': data.get('vintage_to')
+        }
+
+        success, message = update_single_criteria(criteria_id, quantity, criteria, username)
+
+        if success:
+            log_activity(
+                username=username,
+                action_type='update_criteria',
+                target_type='criteria',
+                target_id=str(criteria_id),
+                details=f'Updated criteria {criteria_id}'
             )
             return jsonify({
                 'success': True,

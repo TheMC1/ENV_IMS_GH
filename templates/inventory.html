@@ -971,6 +971,14 @@
         let genericReservedSerials = new Set();
         let availabilityFilter = 'all'; // 'all', 'available', 'reserved'
 
+        // Helper function to format numbers with commas
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '') return '';
+            const n = typeof num === 'number' ? num : parseInt(num);
+            if (isNaN(n)) return num;
+            return n.toLocaleString();
+        }
+
         // User role for access control
         const userRole = '{{ user_role }}';
         const isReadOnly = userRole === 'ops';
@@ -1716,20 +1724,20 @@
 
             // Update row count label - always show underlying row count
             if (filteredUnderlyingRows !== undefined && filteredUnderlyingRows < totalUnderlyingRows) {
-                rowCountInfo.textContent = `Total Inventory: ${filteredUnderlyingRows} of ${totalUnderlyingRows}`;
+                rowCountInfo.textContent = `Total Inventory: ${formatNumber(filteredUnderlyingRows)} of ${formatNumber(totalUnderlyingRows)}`;
             } else {
-                rowCountInfo.textContent = `Total Inventory: ${totalUnderlyingRows}`;
+                rowCountInfo.textContent = `Total Inventory: ${formatNumber(totalUnderlyingRows)}`;
             }
 
             if (rowsPerPage === 'all') {
-                info.textContent = `Showing all ${totalRows} records`;
+                info.textContent = `Showing all ${formatNumber(totalRows)} records`;
                 prevBtn.disabled = true;
                 nextBtn.disabled = true;
                 pageNavigation.style.display = 'none';
             } else {
                 const start = (currentPage - 1) * parseInt(rowsPerPage) + 1;
                 const end = Math.min(currentPage * parseInt(rowsPerPage), totalRows);
-                info.textContent = `Showing ${start}-${end} of ${totalRows} records`;
+                info.textContent = `Showing ${formatNumber(start)}-${formatNumber(end)} of ${formatNumber(totalRows)} records`;
 
                 prevBtn.disabled = currentPage === 1;
                 const totalPages = Math.ceil(totalRows / parseInt(rowsPerPage));
@@ -1930,8 +1938,8 @@
                         } else if (reservedGenericCount > 0) {
                             color = '#856404'; // Yellow - partial
                         }
-                        availTd.innerHTML = `<span style="font-weight: 600; color: ${color};">${availableCount}</span>`;
-                        availTd.title = `${availableCount} available, ${reservedGenericCount} reserved (generic)`;
+                        availTd.innerHTML = `<span style="font-weight: 600; color: ${color};">${formatNumber(availableCount)}</span>`;
+                        availTd.title = `${formatNumber(availableCount)} available, ${formatNumber(reservedGenericCount)} reserved (generic)`;
                     } else {
                         // For by-serial view: show status indicator
                         const isGenericReserved = isRowGenericReserved(row);
@@ -1960,10 +1968,10 @@
                             return underlyingRow && (underlyingRow.is_reserved === 1 || underlyingRow.is_reserved === '1' || underlyingRow.is_reserved === true);
                         }).length;
                         if (reservedCount > 0) {
-                            reservedBadge = `<span class="reserved-badge" title="Reserved for trade">${reservedCount} reserved</span>`;
+                            reservedBadge = `<span class="reserved-badge" title="Reserved for trade">${formatNumber(reservedCount)} reserved</span>`;
                         }
                     }
-                    actionsTd.innerHTML = `<span style="color: #666; font-size: 12px;">${count} row${count !== 1 ? 's' : ''}${reservedBadge}</span>`;
+                    actionsTd.innerHTML = `<span style="color: #666; font-size: 12px;">${formatNumber(count)} row${count !== 1 ? 's' : ''}${reservedBadge}</span>`;
                 } else if (isReadOnly) {
                     // No actions for read-only users, but show reserved badge if applicable
                     if (isReserved) {
