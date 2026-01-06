@@ -111,6 +111,31 @@ def init_database():
         )
     ''')
 
+    # Create system_settings table for global application settings
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        )
+    ''')
+
+    # Initialize default system settings if not exist
+    cursor.execute("SELECT COUNT(*) FROM system_settings WHERE key = 'logging_enabled'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute(
+            "INSERT INTO system_settings (key, value) VALUES (?, ?)",
+            ('logging_enabled', '1')
+        )
+
+    cursor.execute("SELECT COUNT(*) FROM system_settings WHERE key = 'backup_tracking_enabled'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute(
+            "INSERT INTO system_settings (key, value) VALUES (?, ?)",
+            ('backup_tracking_enabled', '1')
+        )
+
     # Initialize default role permissions if not exist
     default_permissions = {
         'admin': ['dashboard', 'inventory', 'warranties', 'trades', 'reports', 'users', 'settings', 'backups', 'logs'],
@@ -891,6 +916,10 @@ def delete_inventory_item(item_id):
 
 def create_inventory_backup(username, action, summary=None):
     """Create a backup snapshot of the entire inventory including warranties"""
+    # Check if backup tracking is enabled
+    if not is_backup_tracking_enabled():
+        return True, None  # Silently skip backup when paused
+
     try:
         # Get all current inventory data
         items = get_all_inventory_items()
@@ -1814,6 +1843,100 @@ def get_available_roles():
 
 
 # =============================================================================
+# SYSTEM SETTINGS FUNCTIONS
+# =============================================================================
+
+def get_system_setting(key, default=None):
+    """
+    Get a system setting value by key.
+
+    Args:
+        key: The setting key to retrieve
+        default: Default value if key not found
+
+    Returns:
+        The setting value or default
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM system_settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        conn.close()
+        return row['value'] if row else default
+    except Exception:
+        return default
+
+
+def set_system_setting(key, value, username=None):
+    """
+    Set a system setting value.
+
+    Args:
+        key: The setting key
+        value: The value to set
+        username: User making the change (optional)
+
+    Returns:
+        (success, message)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO system_settings (key, value, updated_at, updated_by)
+            VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = excluded.updated_by
+        """, (key, value, username))
+        conn.commit()
+        conn.close()
+        return True, "Setting updated"
+    except Exception as e:
+        return False, str(e)
+
+
+def is_logging_enabled():
+    """Check if activity logging is enabled."""
+    return get_system_setting('logging_enabled', '1') == '1'
+
+
+def set_logging_enabled(enabled, username=None):
+    """
+    Enable or disable activity logging.
+
+    Args:
+        enabled: Boolean - True to enable, False to disable
+        username: User making the change
+
+    Returns:
+        (success, message)
+    """
+    return set_system_setting('logging_enabled', '1' if enabled else '0', username)
+
+
+def is_backup_tracking_enabled():
+    """Check if backup tracking is enabled."""
+    return get_system_setting('backup_tracking_enabled', '1') == '1'
+
+
+def set_backup_tracking_enabled(enabled, username=None):
+    """
+    Enable or disable backup tracking.
+
+    Args:
+        enabled: Boolean - True to enable, False to disable
+        username: User making the change
+
+    Returns:
+        (success, message)
+    """
+    return set_system_setting('backup_tracking_enabled', '1' if enabled else '0', username)
+
+
+# =============================================================================
 # ACTIVITY LOGGING FUNCTIONS
 # =============================================================================
 
@@ -1835,6 +1958,10 @@ def log_activity(username, action_type, target_type, target_id=None, serial=None
     Returns:
         (success, log_id or error_message)
     """
+    # Check if logging is enabled (paused)
+    if not is_logging_enabled():
+        return True, None  # Silently skip logging when paused
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()

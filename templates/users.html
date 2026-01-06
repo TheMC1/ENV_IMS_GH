@@ -159,6 +159,52 @@
                     </div>
                 </div>
             </div>
+
+            <!-- System Settings Section -->
+            <div class="user-management-section">
+                <div class="section-header">
+                    <h2>System Settings</h2>
+                    <button class="btn-primary" onclick="toggleSystemSettings()">Configure</button>
+                </div>
+
+                <div id="systemSettingsPanel" class="form-card" style="display: none;">
+                    <p style="color: #666; margin-bottom: 20px;">Configure system-wide settings for the application.</p>
+
+                    <div class="system-settings-content">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Activity Logging</h4>
+                                <p>When paused, no new activity logs will be recorded. Existing logs are preserved.</p>
+                            </div>
+                            <div class="setting-control">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="loggingToggle" onchange="toggleLogging(this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span id="loggingStatusText" class="status-text">Loading...</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Backup Tracking</h4>
+                                <p>When paused, no new inventory backups will be created. Existing backups are preserved.</p>
+                            </div>
+                            <div class="setting-control">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="backupTrackingToggle" onchange="toggleBackupTracking(this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span id="backupTrackingStatusText" class="status-text">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="margin-top: 20px;">
+                        <button type="button" class="btn-secondary" onclick="toggleSystemSettings()">Close</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -300,6 +346,106 @@
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* System Settings Styles */
+        .system-settings-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .setting-info h4 {
+            margin: 0 0 4px 0;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .setting-info p {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-text {
+            font-size: 13px;
+            font-weight: 500;
+            min-width: 60px;
+        }
+
+        .status-text.enabled {
+            color: #28a745;
+        }
+
+        .status-text.paused {
+            color: #dc3545;
+        }
+
+        /* Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #dc3545;
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #28a745;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .toggle-switch input:disabled + .toggle-slider {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
     </style>
 
@@ -674,6 +820,157 @@
             setTimeout(() => {
                 toast.remove();
             }, 3000);
+        }
+
+        // System Settings Functions
+        function toggleSystemSettings() {
+            const panel = document.getElementById('systemSettingsPanel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                loadLoggingStatus();
+                loadBackupTrackingStatus();
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        async function loadLoggingStatus() {
+            const toggle = document.getElementById('loggingToggle');
+            const statusText = document.getElementById('loggingStatusText');
+
+            toggle.disabled = true;
+            statusText.textContent = 'Loading...';
+            statusText.className = 'status-text';
+
+            try {
+                const response = await fetch('/api/system/logging-status');
+                const data = await response.json();
+
+                if (data.success) {
+                    toggle.checked = data.logging_enabled;
+                    updateLoggingStatusText(data.logging_enabled);
+                } else {
+                    showToast('Failed to load logging status', 'error');
+                }
+            } catch (error) {
+                showToast('Error loading logging status: ' + error.message, 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        async function toggleLogging(enabled) {
+            const toggle = document.getElementById('loggingToggle');
+            const statusText = document.getElementById('loggingStatusText');
+
+            toggle.disabled = true;
+            statusText.textContent = 'Saving...';
+
+            try {
+                const response = await fetch('/api/system/logging-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: enabled })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateLoggingStatusText(data.logging_enabled);
+                    showToast(data.message, 'success');
+                } else {
+                    // Revert toggle on error
+                    toggle.checked = !enabled;
+                    showToast(data.error || 'Failed to update logging status', 'error');
+                }
+            } catch (error) {
+                // Revert toggle on error
+                toggle.checked = !enabled;
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        function updateLoggingStatusText(enabled) {
+            const statusText = document.getElementById('loggingStatusText');
+            if (enabled) {
+                statusText.textContent = 'Enabled';
+                statusText.className = 'status-text enabled';
+            } else {
+                statusText.textContent = 'Paused';
+                statusText.className = 'status-text paused';
+            }
+        }
+
+        // Backup Tracking Functions
+        async function loadBackupTrackingStatus() {
+            const toggle = document.getElementById('backupTrackingToggle');
+            const statusText = document.getElementById('backupTrackingStatusText');
+
+            toggle.disabled = true;
+            statusText.textContent = 'Loading...';
+            statusText.className = 'status-text';
+
+            try {
+                const response = await fetch('/api/system/backup-tracking-status');
+                const data = await response.json();
+
+                if (data.success) {
+                    toggle.checked = data.backup_tracking_enabled;
+                    updateBackupTrackingStatusText(data.backup_tracking_enabled);
+                } else {
+                    showToast('Failed to load backup tracking status', 'error');
+                }
+            } catch (error) {
+                showToast('Error loading backup tracking status: ' + error.message, 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        async function toggleBackupTracking(enabled) {
+            const toggle = document.getElementById('backupTrackingToggle');
+            const statusText = document.getElementById('backupTrackingStatusText');
+
+            toggle.disabled = true;
+            statusText.textContent = 'Saving...';
+
+            try {
+                const response = await fetch('/api/system/backup-tracking-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: enabled })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateBackupTrackingStatusText(data.backup_tracking_enabled);
+                    showToast(data.message, 'success');
+                } else {
+                    // Revert toggle on error
+                    toggle.checked = !enabled;
+                    showToast(data.error || 'Failed to update backup tracking status', 'error');
+                }
+            } catch (error) {
+                // Revert toggle on error
+                toggle.checked = !enabled;
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        function updateBackupTrackingStatusText(enabled) {
+            const statusText = document.getElementById('backupTrackingStatusText');
+            if (enabled) {
+                statusText.textContent = 'Enabled';
+                statusText.className = 'status-text enabled';
+            } else {
+                statusText.textContent = 'Paused';
+                statusText.className = 'status-text paused';
+            }
         }
     </script>
     <script>

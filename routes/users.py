@@ -17,7 +17,11 @@ from database import (
     get_role_permissions,
     update_role_permissions,
     get_available_pages,
-    get_available_roles
+    get_available_roles,
+    is_logging_enabled,
+    set_logging_enabled,
+    is_backup_tracking_enabled,
+    set_backup_tracking_enabled
 )
 
 users_bp = Blueprint('users', __name__)
@@ -215,6 +219,83 @@ def update_role_perms(role):
 
         if success:
             return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# System Settings API Endpoints
+@users_bp.route('/api/system/logging-status', methods=['GET'])
+@admin_required
+def get_logging_status():
+    """Get the current activity logging status"""
+    try:
+        enabled = is_logging_enabled()
+        return jsonify({
+            'success': True,
+            'logging_enabled': enabled
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@users_bp.route('/api/system/logging-status', methods=['POST'])
+@admin_required
+def set_logging_status():
+    """Enable or disable activity logging"""
+    try:
+        data = request.json
+        enabled = data.get('enabled', True)
+        username = session.get('user')
+
+        success, message = set_logging_enabled(enabled, username)
+
+        if success:
+            status = 'enabled' if enabled else 'paused'
+            return jsonify({
+                'success': True,
+                'message': f'Activity logging {status}',
+                'logging_enabled': enabled
+            })
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@users_bp.route('/api/system/backup-tracking-status', methods=['GET'])
+@admin_required
+def get_backup_tracking_status():
+    """Get the current backup tracking status"""
+    try:
+        enabled = is_backup_tracking_enabled()
+        return jsonify({
+            'success': True,
+            'backup_tracking_enabled': enabled
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@users_bp.route('/api/system/backup-tracking-status', methods=['POST'])
+@admin_required
+def set_backup_tracking_status():
+    """Enable or disable backup tracking"""
+    try:
+        data = request.json
+        enabled = data.get('enabled', True)
+        username = session.get('user')
+
+        success, message = set_backup_tracking_enabled(enabled, username)
+
+        if success:
+            status = 'enabled' if enabled else 'paused'
+            return jsonify({
+                'success': True,
+                'message': f'Backup tracking {status}',
+                'backup_tracking_enabled': enabled
+            })
         else:
             return jsonify({'error': message}), 500
     except Exception as e:
